@@ -13,7 +13,7 @@ import {
     removeTechBreak,
     bookAppointment,
     clearAppointment,
-    getAppointmentBySlot,
+    getAppointmentById,
     generateId,
     durationToPx,
     moveAppointment,
@@ -507,6 +507,7 @@ function createScheduleRow(item, appointments) {
 
     if (item.type === 'lunch') row.classList.add('schedule__row--lunch');
     else if (item.type === 'techBreak') row.classList.add('schedule__row--techbreak');
+    else if (item.type === 'bookedAppointment') row.classList.add('schedule__row--booked');
 
     const timeCol = document.createElement('div');
     timeCol.className = 'schedule__time';
@@ -522,14 +523,12 @@ function createScheduleRow(item, appointments) {
         contentCol.innerHTML = createLunchBlock();
     } else if (item.type === 'techBreak') {
         contentCol.innerHTML = createTechBreakBlock(item.id);
+    } else if (item.type === 'bookedAppointment' && item.data) {
+        // Booked appointment (time-based block)
+        contentCol.innerHTML = createBookedSlot(item.data, item.start);
     } else {
-        const apt = appointments.find(a => a.slotIndex === item.slotIndex);
-        if (apt && apt.isBooked) {
-            row.classList.add('schedule__row--booked');
-            contentCol.innerHTML = createBookedSlot(apt, item.start, item.slotIndex);
-        } else {
-            contentCol.innerHTML = createAvailableSlot(item.slotIndex);
-        }
+        // Empty slot
+        contentCol.innerHTML = createAvailableSlot(item.start);
     }
 
     row.appendChild(timeCol);
@@ -559,9 +558,9 @@ function createTechBreakBlock(breakId) {
   `;
 }
 
-function createAvailableSlot(slotIndex) {
+function createAvailableSlot(startTime) {
     return `
-    <div class="slot--available" data-slot-index="${slotIndex}">
+    <div class="slot--available" data-slot-start="${startTime}">
       <span class="slot--available__text">
         <span class="material-symbols-outlined">add_circle</span>
         ${t('available')}
@@ -570,7 +569,7 @@ function createAvailableSlot(slotIndex) {
   `;
 }
 
-function createBookedSlot(apt, startTime, slotIndex) {
+function createBookedSlot(apt, startTime) {
     const statusClass = `status--${apt.status}`;
     const statusLabel = t(apt.status === 'checked-in' ? 'checkedIn' : apt.status === 'no-show' ? 'noShow' : apt.status);
     const contactIcon = apt.contact.includes('@') ? 'mail' : 'call';
@@ -578,7 +577,7 @@ function createBookedSlot(apt, startTime, slotIndex) {
     const cancelledNote = apt.status === 'cancelled' ? `<span class="slot__cancelled-note">${t('cancelledByClient')}</span>` : '';
 
     return `
-    <div class="slot--booked ${statusClass}" data-slot-index="${slotIndex}" data-start-time="${startTime}">
+    <div class="slot--booked ${statusClass}" data-appointment-id="${apt.id}" data-start-time="${startTime}">
       <div class="slot__drag-handle no-print">
         <span class="material-symbols-outlined">drag_indicator</span>
       </div>
@@ -593,7 +592,7 @@ function createBookedSlot(apt, startTime, slotIndex) {
       ${noteHtml}
       <div class="slot__actions">
         <span class="slot__status slot__status--${apt.status}">${statusLabel}</span>
-        <button class="slot__clear-btn no-print" data-slot-index="${slotIndex}" title="${t('clearSlot')}">
+        <button class="slot__clear-btn no-print" data-appointment-id="${apt.id}" title="${t('clearSlot')}">
           <span class="material-symbols-outlined">delete</span>
         </button>
       </div>
@@ -635,12 +634,12 @@ function attachDragHandlers() {
         }
     });
 
-    // NEW: Attach drag handlers to booked slots
+    // Attach drag handlers to booked appointments using ID
     document.querySelectorAll('.slot--booked').forEach(slot => {
-        const slotIndex = parseInt(slot.dataset.slotIndex, 10);
+        const appointmentId = slot.dataset.appointmentId;
         const startTime = slot.dataset.startTime;
-        if (!isNaN(slotIndex) && startTime) {
-            makeDraggable(slot, 'appointment', startTime, slotIndex);
+        if (appointmentId && startTime) {
+            makeDraggable(slot, 'appointment', startTime, appointmentId);
         }
     });
 }
@@ -655,12 +654,9 @@ function handleDragPreview(dragResult) {
     } else if (dragResult.type === 'techBreak') {
         state.schedule = moveTechBreak(state.schedule, dragResult.breakId, dragResult.proposedTime);
     } else if (dragResult.type === 'appointment') {
-        // Find target slot index based on proposed time
-        const targetSlot = state.computed.slots.find(s => s.start === dragResult.proposedTime);
-        if (targetSlot) {
-            const oldSlotIndex = parseInt(dragResult.breakId, 10);
-            state.schedule = moveAppointment(state.schedule, oldSlotIndex, targetSlot.slotIndex);
-        }
+        // Move appointment to new start time (like lunch)
+        const appointmentId = dragResult.breakId;
+        state.schedule = moveAppointment(state.schedule, appointmentId, dragResult.proposedTime);
     }
 
     state.ui.previewMode = true;
@@ -699,11 +695,12 @@ function cancelPreview() {
 // Drawer (Edit Panel)
 // ==========================================
 
-function openDrawer(slotIndex) {
-    state.ui.selectedSlotId = slotIndex;
+function openDrawer(appointmentId, startTime) {
+    state.ui.selectedSlotId = appointmentId; // Now stores appointment ID or null for new
+    state.ui.selectedTime = startTime;
     state.ui.drawerOpen = true;
 
-    const apt = getAppointmentBySlot(state.schedule, slotIndex);
+    const apt = appointmentId ? getAppointmentById(state.schedule, appointmentId) : null;
 
     if (elements.clientName) elements.clientName.value = apt?.name || '';
     if (elements.clientContact) elements.clientContact.value = apt?.contact || '';
@@ -720,14 +717,16 @@ function openDrawer(slotIndex) {
 
 function closeDrawer() {
     state.ui.selectedSlotId = null;
+    state.ui.selectedTime = null;
     state.ui.drawerOpen = false;
     elements.drawer?.classList.remove('open');
     elements.mainContent?.classList.remove('drawer-open');
 }
 
 function saveSlot() {
-    const slotIndex = state.ui.selectedSlotId;
-    if (slotIndex === null) return;
+    const startTime = state.ui.selectedTime;
+    const appointmentId = state.ui.selectedSlotId;
+    if (!startTime) return;
 
     const name = elements.clientName?.value.trim() || '';
     const contact = elements.clientContact?.value.trim() || '';
@@ -735,10 +734,12 @@ function saveSlot() {
     const activeStatusBtn = elements.statusButtons?.querySelector('.status-btn.active');
     const status = activeStatusBtn?.dataset.status || 'scheduled';
 
-    if (!name) {
-        state.schedule = clearAppointment(state.schedule, slotIndex);
-    } else {
-        state.schedule = bookAppointment(state.schedule, slotIndex, { name, contact, notes, status });
+    if (!name && appointmentId) {
+        // Clear existing appointment if name is empty
+        state.schedule = clearAppointment(state.schedule, appointmentId);
+    } else if (name) {
+        // Book or update appointment
+        state.schedule = bookAppointment(state.schedule, startTime, { name, contact, notes, status }, appointmentId);
     }
 
     closeDrawer();
@@ -747,9 +748,9 @@ function saveSlot() {
 }
 
 function clearSlot() {
-    const slotIndex = state.ui.selectedSlotId;
-    if (slotIndex !== null) {
-        state.schedule = clearAppointment(state.schedule, slotIndex);
+    const appointmentId = state.ui.selectedSlotId;
+    if (appointmentId) {
+        state.schedule = clearAppointment(state.schedule, appointmentId);
         closeDrawer();
         renderSchedule();
         saveScheduleToFirebase();
@@ -784,8 +785,8 @@ function handleDeleteTechBreak(breakId) {
     saveScheduleToFirebase();
 }
 
-function handleClearSlot(slotIndex) {
-    state.schedule = clearAppointment(state.schedule, slotIndex);
+function handleClearAppointment(appointmentId) {
+    state.schedule = clearAppointment(state.schedule, appointmentId);
     renderSchedule();
     saveScheduleToFirebase();
 }
@@ -831,15 +832,26 @@ function setupEventListeners() {
         const clearBtn = e.target.closest('.slot__clear-btn');
         if (clearBtn) {
             e.stopPropagation();
-            const slotIndex = parseInt(clearBtn.dataset.slotIndex, 10);
-            if (!isNaN(slotIndex)) handleClearSlot(slotIndex);
+            const appointmentId = clearBtn.dataset.appointmentId;
+            if (appointmentId) handleClearAppointment(appointmentId);
             return;
         }
 
-        const slot = e.target.closest('[data-slot-index]');
-        if (slot) {
-            const slotIndex = parseInt(slot.dataset.slotIndex, 10);
-            openDrawer(slotIndex);
+        // Click on booked appointment to edit
+        const bookedSlot = e.target.closest('.slot--booked');
+        if (bookedSlot) {
+            const appointmentId = bookedSlot.dataset.appointmentId;
+            const startTime = bookedSlot.dataset.startTime;
+            openDrawer(appointmentId, startTime);
+            return;
+        }
+
+        // Click on available slot to add new
+        const availableSlot = e.target.closest('.slot--available');
+        if (availableSlot) {
+            const startTime = availableSlot.dataset.slotStart;
+            openDrawer(null, startTime);
+            return;
         }
     });
 

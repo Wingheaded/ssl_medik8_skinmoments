@@ -70,7 +70,7 @@ export function createInitialState() {
         schedule: {
             lunchStart: '13:00',
             techBreaks: [], // Array of { id, start }
-            appointments: [] // Array of { id, isBooked, name, contact, notes, status, slotIndex }
+            appointments: [] // Array of { id, start, isBooked, name, contact, notes, status }
         },
         proposed: null,
         needsReschedule: [],
@@ -88,9 +88,9 @@ export function generateId() {
 }
 
 /**
- * Build list of blocked intervals from lunch and tech breaks
+ * Build list of blocked intervals from lunch, tech breaks, AND appointments
  */
-function buildBlockedIntervals(schedule) {
+function buildBlockedIntervals(schedule, includeAppointments = true) {
     const blocked = [];
 
     // Add lunch block
@@ -110,6 +110,22 @@ function buildBlockedIntervals(schedule) {
             type: 'techBreak',
             id: tb.id
         });
+    }
+
+    // Add booked appointments as blocks (like lunch)
+    if (includeAppointments) {
+        for (const apt of schedule.appointments) {
+            if (apt.isBooked && apt.start) {
+                const aptStartMin = timeToMinutes(apt.start);
+                blocked.push({
+                    start: aptStartMin,
+                    end: aptStartMin + SLOT_DURATION,
+                    type: 'bookedAppointment',
+                    id: apt.id,
+                    data: apt
+                });
+            }
+        }
     }
 
     blocked.sort((a, b) => a.start - b.start);
@@ -173,38 +189,27 @@ function generateSlots(available) {
 
 /**
  * Main reflow function - regenerate schedule when breaks change
+ * Now treats appointments as time-based blocks (like lunch)
  */
 export function reflow(schedule) {
     const dayEnd = timeToMinutes(DAY_END);
+    const dayStart = timeToMinutes(DAY_START);
 
-    // Build blocked intervals
-    const blocked = buildBlockedIntervals(schedule);
+    // Build blocked intervals (including appointments)
+    const blocked = buildBlockedIntervals(schedule, true);
 
-    // Build available intervals
+    // Build available intervals (gaps between all blocks)
     const available = buildAvailableIntervals(blocked);
 
-    // Generate new slots
+    // Generate empty slots from available intervals
     const slots = generateSlots(available);
 
-    // Reassign booked appointments to slots
-    const occupiedSlots = new Set();
+    // Keep track of booked appointments
     const bookedAppointments = schedule.appointments.filter(apt => apt.isBooked);
-    const assignedAppointments = [];
     const needsReschedule = [];
-
-    for (const apt of bookedAppointments) {
-        if (apt.slotIndex >= 0 && apt.slotIndex < slots.length && !occupiedSlots.has(apt.slotIndex)) {
-            assignedAppointments.push(apt);
-            slots[apt.slotIndex].appointmentId = apt.id;
-            occupiedSlots.add(apt.slotIndex);
-        } else {
-            needsReschedule.push(apt);
-        }
-    }
 
     // Build the full schedule items list (for rendering)
     const scheduleItems = [];
-    const dayStart = timeToMinutes(DAY_START);
     let itemCursor = dayStart;
 
     const allBlocks = [...blocked];
@@ -215,16 +220,23 @@ export function reflow(schedule) {
         const nextSlot = slots[slotIdx];
 
         if (nextSlot && (!nextBlock || timeToMinutes(nextSlot.start) < nextBlock.start)) {
+            // Empty slot
             scheduleItems.push(nextSlot);
             itemCursor = timeToMinutes(nextSlot.end);
             slotIdx++;
         } else if (nextBlock) {
-            scheduleItems.push({
+            // Block (lunch, tech break, or booked appointment)
+            const item = {
                 id: nextBlock.id || `${nextBlock.type}-${nextBlock.start}`,
                 start: minutesToTime(nextBlock.start),
                 end: minutesToTime(nextBlock.end),
                 type: nextBlock.type
-            });
+            };
+            // If it's a booked appointment, attach data
+            if (nextBlock.type === 'bookedAppointment') {
+                item.data = nextBlock.data;
+            }
+            scheduleItems.push(item);
             itemCursor = nextBlock.end;
             const idx = allBlocks.indexOf(nextBlock);
             if (idx > -1) allBlocks.splice(idx, 1);
@@ -236,7 +248,7 @@ export function reflow(schedule) {
     return {
         slots,
         scheduleItems,
-        appointments: assignedAppointments,
+        appointments: bookedAppointments,
         needsReschedule
     };
 }
@@ -289,25 +301,29 @@ export function moveTechBreak(schedule, breakId, newStart) {
 }
 
 /**
- * Book an appointment in a slot
+ * Book an appointment at a specific start time
+ * @param {Object} schedule - Current schedule
+ * @param {string} startTime - Start time "HH:MM"
+ * @param {Object} details - Appointment details
+ * @param {string} [appointmentId] - Optional, for updating existing
  */
-export function bookAppointment(schedule, slotIndex, details) {
-    const existingApt = schedule.appointments.find(a => a.slotIndex === slotIndex);
-
-    if (existingApt) {
+export function bookAppointment(schedule, startTime, details, appointmentId = null) {
+    if (appointmentId) {
+        // Update existing appointment
         return {
             ...schedule,
             appointments: schedule.appointments.map(a =>
-                a.slotIndex === slotIndex
-                    ? { ...a, ...details, isBooked: true }
+                a.id === appointmentId
+                    ? { ...a, ...details, start: startTime, isBooked: true }
                     : a
             )
         };
     }
 
+    // Create new appointment
     const newApt = {
         id: generateId(),
-        slotIndex: slotIndex,
+        start: startTime,
         isBooked: true,
         name: details.name || '',
         contact: details.contact || '',
@@ -323,50 +339,38 @@ export function bookAppointment(schedule, slotIndex, details) {
 }
 
 /**
- * Clear an appointment from a slot
+ * Clear an appointment by ID
  */
-export function clearAppointment(schedule, slotIndex) {
+export function clearAppointment(schedule, appointmentId) {
     return {
         ...schedule,
-        appointments: schedule.appointments.filter(a => a.slotIndex !== slotIndex)
+        appointments: schedule.appointments.filter(a => a.id !== appointmentId)
     };
 }
 
 /**
- * Get appointment by slot index
+ * Get appointment by ID
  */
-export function getAppointmentBySlot(schedule, slotIndex) {
-    return schedule.appointments.find(a => a.slotIndex === slotIndex) || null;
+export function getAppointmentById(schedule, appointmentId) {
+    return schedule.appointments.find(a => a.id === appointmentId) || null;
 }
 
 /**
- * Move appointment from one slot to another (swap if target occupied)
+ * Get appointment by slot index (legacy, for backward compat)
  */
-export function moveAppointment(schedule, fromSlotIndex, toSlotIndex) {
-    const fromApt = schedule.appointments.find(a => a.slotIndex === fromSlotIndex);
-    const toApt = schedule.appointments.find(a => a.slotIndex === toSlotIndex);
+export function getAppointmentBySlot(schedule, slotIndex) {
+    // No longer used with time-based system
+    return null;
+}
 
-    if (!fromApt) return schedule;
-
-    let updatedAppointments = [...schedule.appointments];
-
-    if (toApt) {
-        // Swap
-        updatedAppointments = updatedAppointments.map(a => {
-            if (a.id === fromApt.id) return { ...a, slotIndex: toSlotIndex };
-            if (a.id === toApt.id) return { ...a, slotIndex: fromSlotIndex };
-            return a;
-        });
-    } else {
-        // Simple move
-        updatedAppointments = updatedAppointments.map(a => {
-            if (a.id === fromApt.id) return { ...a, slotIndex: toSlotIndex };
-            return a;
-        });
-    }
-
+/**
+ * Move appointment to a new start time (like moving lunch)
+ */
+export function moveAppointment(schedule, appointmentId, newStartTime) {
     return {
         ...schedule,
-        appointments: updatedAppointments
+        appointments: schedule.appointments.map(a =>
+            a.id === appointmentId ? { ...a, start: newStartTime } : a
+        )
     };
 }
