@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Medik8 Skin Moments Daily Scheduler</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&amp;family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#7B9E89", // Muted sage green accent from prompt
+                        "primary-dark": "#5e7d6b",
+                        "background-light": "#F9F9F7", // Warm off-white
+                        "background-dark": "#1A1A1A", // Dark mode charcoal
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#262626",
+                        "text-light": "#333333", // Charcoal text
+                        "text-dark": "#E5E5E5",
+                        "border-light": "#E0E0E0",
+                        "border-dark": "#404040",
+                        "slot-booked-light": "#F2F2F2",
+                        "slot-booked-dark": "#333333",
+                        "lunch-light": "#EDF2EF", // Very light sage
+                        "lunch-dark": "#2A332E", 
+                    },
+                    fontFamily: {
+                        display: ["Cinzel", "serif"], // For brand headers
+                        sans: ["Manrope", "sans-serif"], // Clean humanist sans-serif
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        'float': '0 10px 30px -5px rgba(0, 0, 0, 0.1)',
+                    }
+                },
+            },
+        };
+    </script>
+<style>::-webkit-scrollbar {
+    width: 8px
+    }
+::-webkit-scrollbar-track {
+    background: transparent
+    }
+::-webkit-scrollbar-thumb {
+    background-color: #CBD5E1;
+    border-radius: 20px
+    }
+.dark ::-webkit-scrollbar-thumb {
+    background-color: #4B5563
+    }.dashed-zone {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuClRBnQGNUzQ1aDjYQW4URFdue0oKNEzJYtOY9xaP39p9wjlalUhMCH4YnJyf-A6UdEADw1uK1exNJR8vJUiVSVOUxraYFinxoQbkEmkkXNiGOa2lbylM3i3eelpFwBWxjBsZ1j680rE9ioJ7mlj8J2rE2H6JzXLiy1Y0QBjq8lZFw3QsyBN8Clg-vvdI8235pJvmJcUQSasQhos0F547kebbDi6Is1lw1cC2Dm9dzLe88J-cTb95dviWKXELJhjeAEsgmDAO9yAadg)
+    }
+.dark .dashed-zone {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuBnnkPxPpKFRrxWAj5DUPnBdabFCD4BkCTHP5SujE34rgGz5fnzdh6VXQBba7zcdD-6V65NiN8FdEv8DZQHUDNxxYIFLmRVwqGe4StxE_8QmSf7Eg616CqGAsVb0M2JntMPoA7E8COD6ZzglsZeUdlh8ETqkZfQIdgDZM81mf9cLxe0pI_PjcC0nOqIedWInhOH2mEWxpeWpIulkVfPNxdq0dlyXeR6iXa-Imaz1MaIzyp6oyZjAaCToWxJzUb1PI4kUhfs7CF3o601)
+    }</style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-sans antialiased min-h-screen transition-colors duration-300">
+<header class="sticky top-0 z-50 bg-surface-light/90 dark:bg-surface-dark/90 backdrop-blur-md border-b border-border-light dark:border-border-dark px-6 py-4 shadow-soft">
+<div class="max-w-5xl mx-auto flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="text-2xl font-display font-semibold tracking-widest text-black dark:text-white">Medik8</div>
+<div class="h-6 w-px bg-border-light dark:bg-border-dark hidden md:block"></div>
+<div class="hidden md:flex flex-col">
+<span class="text-xs uppercase tracking-widest text-gray-500 dark:text-gray-400">Location</span>
+<span class="text-sm font-medium">Farmácia Central, Lisbon</span>
+</div>
+</div>
+<div class="flex items-center bg-background-light dark:bg-background-dark rounded-full p-1 border border-border-light dark:border-border-dark shadow-sm">
+<button class="p-2 rounded-full hover:bg-white dark:hover:bg-surface-dark transition-colors text-gray-500 dark:text-gray-400">
+<span class="material-icons-outlined text-xl">chevron_left</span>
+</button>
+<div class="flex flex-col items-center px-6 min-w-[140px] cursor-pointer group">
+<span class="text-xs font-semibold text-primary uppercase tracking-wider group-hover:underline">Today</span>
+<span class="text-sm font-bold text-text-light dark:text-text-dark">Wed, Oct 25</span>
+</div>
+<button class="p-2 rounded-full hover:bg-white dark:hover:bg-surface-dark transition-colors text-gray-500 dark:text-gray-400">
+<span class="material-icons-outlined text-xl">chevron_right</span>
+</button>
+</div>
+<div class="flex items-center gap-4">
+<button class="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium text-text-light dark:text-text-dark bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700 transition-colors shadow-sm">
+<span class="material-icons-outlined text-lg">print</span>
+                    Print
+                </button>
+<button class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-dark transition-colors shadow-sm">
+<span class="material-icons-outlined text-lg">add</span>
+<span class="hidden sm:inline">Technical Break</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-display font-bold text-xs border border-primary/30">
+                    SL
+                </div>
+</div>
+</div>
+</header>
+<main class="max-w-5xl mx-auto px-4 py-8 pb-32">
+<div class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+<div>
+<h1 class="font-display text-3xl md:text-4xl text-text-light dark:text-text-dark mb-2">Agenda Skin Moments</h1>
+<p class="text-gray-500 dark:text-gray-400 font-light">Customized Moments • 45 minutes per session</p>
+</div>
+<div class="flex items-center gap-3 bg-white dark:bg-surface-dark py-2 px-4 rounded-lg border border-border-light dark:border-border-dark shadow-sm">
+<div class="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+<img alt="Expert Avatar" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVKGIbXO-UPO_QZ0YN8SsgHw_eyFGHlIQPDK7iQuytaRmQc-V0yyq2v0ARUbvusJJvYHBEeQhCrGqDB6bUfBxvuq3-Y2e4YDN4CGIGYnkhFUFIBLSPcr-0eXsUtafn3LQtrX1ftV6dUwWgpj3CH3GW0rUyB4KAMLUmdCGTqtHotqWUCjnAT2hQkOHkXv_5DZcXRzSmnCKvfzXW-92mIGmPfyd1R-8hivWAooSt0olefYjRGFR6nPRvyH6Lywc0zfnvrf_p3vpBRKEn"/>
+</div>
+<div class="flex flex-col">
+<span class="text-xs uppercase text-gray-500 dark:text-gray-400 font-semibold tracking-wider">Skin Expert</span>
+<span class="text-sm font-bold">Sofia Martinez</span>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-surface-dark rounded-xl shadow-soft border border-border-light dark:border-border-dark overflow-hidden relative">
+<div class="grid grid-cols-12 bg-gray-50 dark:bg-neutral-800 border-b border-border-light dark:border-border-dark py-3 px-4 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 sticky top-0 z-10">
+<div class="col-span-2 md:col-span-1">Time</div>
+<div class="col-span-10 md:col-span-11 pl-4">Details</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark/50 min-h-[72px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark/50 text-sm font-medium text-gray-400 flex flex-col justify-between">
+<span>09:00</span>
+<span class="text-xs opacity-50">09:45</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2 relative">
+<div class="h-full w-full rounded-lg dashed-zone flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors group">
+<span class="text-sm text-gray-400 font-medium group-hover:text-primary transition-colors flex items-center gap-2">
+<span class="material-icons-outlined text-lg">add_circle_outline</span> Available
+                        </span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark/50 min-h-[72px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark/50 text-sm font-medium text-text-light dark:text-text-dark flex flex-col justify-between">
+<span>10:00</span>
+<span class="text-xs text-gray-400">10:45</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2">
+<div class="bg-slot-booked-light dark:bg-slot-booked-dark h-full w-full rounded-lg p-3 flex flex-col md:flex-row md:items-center justify-between border-l-4 border-blue-400 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+<div class="flex flex-col mb-2 md:mb-0">
+<span class="font-bold text-text-light dark:text-white">Maria Silva</span>
+<span class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
+<span class="material-icons-outlined text-[14px]">phone</span> +351 912 345 678
+                            </span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-xs font-medium text-gray-500 dark:text-gray-400 hidden md:block italic">First appointment</span>
+<span class="px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-semibold border border-blue-200 dark:border-blue-800">Scheduled</span>
+<button class="text-gray-400 hover:text-text-light dark:hover:text-white"><span class="material-icons-outlined">more_vert</span></button>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark/50 min-h-[72px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark/50 text-sm font-medium text-text-light dark:text-text-dark flex flex-col justify-between">
+<span>10:45</span>
+<span class="text-xs text-gray-400">11:30</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2">
+<div class="bg-white dark:bg-neutral-800 border border-green-200 dark:border-green-900 h-full w-full rounded-lg p-3 flex flex-col md:flex-row md:items-center justify-between border-l-4 border-l-green-500 shadow-sm">
+<div class="flex flex-col mb-2 md:mb-0">
+<span class="font-bold text-text-light dark:text-white">Ana Costa</span>
+<span class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
+<span class="material-icons-outlined text-[14px]">mail</span> ana.costa@email.com
+                            </span>
+</div>
+<div class="flex items-center gap-3">
+<span class="px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-semibold border border-green-200 dark:border-green-800">Checked-in</span>
+<button class="text-gray-400 hover:text-text-light dark:hover:text-white"><span class="material-icons-outlined">more_vert</span></button>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark/50 min-h-[24px]">
+<div class="col-span-2 md:col-span-1 py-2 px-4 border-r border-border-light/50 dark:border-border-dark/50 text-xs font-medium text-gray-400">
+<span>11:30</span>
+</div>
+<div class="col-span-10 md:col-span-11 px-2 py-1">
+<div class="bg-lunch-light dark:bg-lunch-dark/50 border border-primary/20 h-full w-full rounded flex items-center justify-center gap-2 cursor-grab active:cursor-grabbing opacity-70">
+<span class="material-icons-outlined text-primary text-sm">coffee</span>
+<span class="text-xs font-semibold text-primary uppercase tracking-wide">Technical Break (15m)</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark/50 min-h-[72px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark/50 text-sm font-medium text-gray-400 flex flex-col justify-between">
+<span>11:45</span>
+<span class="text-xs opacity-50">12:30</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2">
+<div class="h-full w-full rounded-lg dashed-zone flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors group">
+<span class="text-sm text-gray-400 font-medium group-hover:text-primary transition-colors flex items-center gap-2">
+<span class="material-icons-outlined text-lg">add_circle_outline</span> Available
+                        </span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-dashed border-primary/50 bg-primary/5 dark:bg-primary/10 min-h-[72px] relative overflow-hidden">
+<div class="absolute inset-0 pattern-diagonal-lines opacity-10"></div>
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark/50 text-sm font-bold text-primary flex flex-col justify-between z-10">
+<span>12:30</span>
+<span class="text-xs opacity-80">13:15</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2 z-10 flex items-center justify-center">
+<span class="text-primary font-medium text-sm animate-pulse">Drop to reschedule appointment...</span>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark/50 min-h-[96px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark/50 text-sm font-medium text-gray-400 flex flex-col justify-between">
+<span>13:15</span>
+<span class="text-xs opacity-50">14:15</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-0">
+<div class="bg-lunch-light dark:bg-lunch-dark h-full w-full flex flex-col items-center justify-center border-l-4 border-primary/40 relative group cursor-grab">
+<div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-primary">
+<span class="material-icons-outlined">drag_indicator</span>
+</div>
+<span class="font-display text-lg tracking-widest text-text-light dark:text-text-dark font-medium">PAUSA ALMOÇO</span>
+<span class="text-xs text-primary font-medium uppercase tracking-wider mt-1">60 Minutes</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark/50 min-h-[72px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark/50 text-sm font-medium text-text-light dark:text-text-dark flex flex-col justify-between">
+<span>14:15</span>
+<span class="text-xs text-gray-400">15:00</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2">
+<div class="bg-slot-booked-light dark:bg-slot-booked-dark h-full w-full rounded-lg p-3 flex flex-col md:flex-row md:items-center justify-between border-l-4 border-gray-400 shadow-sm cursor-pointer opacity-60 grayscale">
+<div class="flex flex-col mb-2 md:mb-0">
+<span class="font-bold text-text-light dark:text-white line-through">Beatriz Santos</span>
+<span class="text-xs text-red-500 font-medium mt-1">Cancelled by Client</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold border border-gray-300 dark:border-gray-600">Cancelled</span>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark/50 min-h-[72px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark/50 text-sm font-medium text-gray-400 flex flex-col justify-between">
+<span>15:00</span>
+<span class="text-xs opacity-50">15:45</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2">
+<div class="h-full w-full rounded-lg dashed-zone flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors group">
+<span class="text-sm text-gray-400 font-medium group-hover:text-primary transition-colors flex items-center gap-2">
+<span class="material-icons-outlined text-lg">add_circle_outline</span> Available
+                        </span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark/50 min-h-[72px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark/50 text-sm font-medium text-gray-400 flex flex-col justify-between">
+<span>15:45</span>
+<span class="text-xs opacity-50">16:30</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2">
+<div class="h-full w-full rounded-lg dashed-zone flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors group">
+<span class="text-sm text-gray-400 font-medium group-hover:text-primary transition-colors flex items-center gap-2">
+<span class="material-icons-outlined text-lg">add_circle_outline</span> Available
+                        </span>
+</div>
+</div>
+</div>
+</div>
+<div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[90%] max-w-2xl z-50 animate-bounce-slight">
+<div class="bg-surface-light dark:bg-neutral-800 rounded-xl shadow-float border border-primary/20 p-4 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="bg-primary/10 rounded-full p-2 text-primary">
+<span class="material-icons-outlined">edit_calendar</span>
+</div>
+<div>
+<p class="font-bold text-sm text-text-light dark:text-white">Schedule Updated</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">Review changes to the 12:30 slot.</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+<button class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark shadow-md rounded-lg transition-colors">
+                        Apply Changes
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<div class="fixed top-0 right-0 -z-10 opacity-30 dark:opacity-10 pointer-events-none">
+<svg fill="none" height="400" viewBox="0 0 400 400" width="400" xmlns="http://www.w3.org/2000/svg">
+<path d="M350 50 L400 0 M350 50 L300 100 M350 50 L400 100" stroke="#7B9E89" stroke-width="1"></path>
+<circle cx="300" cy="150" r="40" stroke="#7B9E89" stroke-width="1"></circle>
+<path d="M260 150 L220 150" stroke="#7B9E89" stroke-width="1"></path>
+<circle cx="180" cy="150" r="40" stroke="#7B9E89" stroke-width="1"></circle>
+</svg>
+</div>
+<script>
+        // Simple dark mode toggle logic for preview purposes (optional)
+        // Check system preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        // Listen for changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+    </script>
+
+</body></html>

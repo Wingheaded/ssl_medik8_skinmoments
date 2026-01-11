@@ -1,0 +1,47 @@
+/* Header Date Nav Improvements */
+.header__date-nav {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.header__date-nav-content {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.header__date-picker {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 1;
+    /* Above display but invisible */
+    pointer-events: none;
+    /* Let clicks pass to display, we trigger picker programmatically via showPicker */
+}
+
+/* Make the date display look interactive */
+.header__date-info {
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.2s;
+    position: relative;
+    z-index: 2;
+}
+
+.header__date-info:hover {
+    opacity: 0.8;
+}
+
+/* Ensure buttons are clickable */
+.header__date-btn {
+    z-index: 2;
+}

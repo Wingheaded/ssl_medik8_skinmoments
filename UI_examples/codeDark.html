@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html class="dark" lang="pt"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Medik8 Skin Moments - Agenda Diária</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&amp;family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#7B9E89", // Muted sage green
+                        "primary-dark": "#5e7d6b",
+                        "background-light": "#F9F9F7", 
+                        "background-dark": "#121212", // Deep charcoal/near-black
+                        "surface-light": "#FFFFFF",
+                        "surface-dark": "#1E1E1E", // Slightly lighter for cards/sidebar
+                        "text-light": "#333333", 
+                        "text-dark": "#EAEAEA", // Warm off-white
+                        "text-muted": "#A3A3A3",
+                        "border-light": "#E0E0E0",
+                        "border-dark": "#333333", // Subtle grey divider
+                        "slot-booked-light": "#F2F2F2",
+                        "slot-booked-dark": "#2C2C2C",
+                        "lunch-light": "#EDF2EF",
+                        "lunch-dark": "#222825", // Dark sage hint
+                    },
+                    fontFamily: {
+                        display: ["Cinzel", "serif"],
+                        sans: ["Manrope", "sans-serif"],
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        'float': '0 10px 30px -5px rgba(0, 0, 0, 0.3)',
+                        'sidebar': '-5px 0 30px rgba(0, 0, 0, 0.5)',
+                    }
+                },
+            },
+        };
+    </script>
+<style>::-webkit-scrollbar {
+    width: 8px
+    }
+::-webkit-scrollbar-track {
+    background: transparent
+    }
+::-webkit-scrollbar-thumb {
+    background-color: #525252;
+    border-radius: 20px
+    }
+.dashed-zone {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuDa1ZF57FGCFK3HXBACUzB_loXS7RWO_hWixjXdHGIaEQ9r5tuDWBlQJtlE46ZbzlQI2VnbtG00f70UY4BQ7Jkh6BFIiIwtmLPpb1BhzBDNGRxFU9TpLp63ZTDvdSdnf8PIOw_lCXE9hqwgR73M2hEm-016M2DbtBrqSPDZ4vr4aEtKLNUu9EHsK50dlo7TjuVjrbvmid57SzdJtT7nv9gnBvkrcoc9_o2u1e4mcekngHNcGGhFA846wYBpps9WPWP9j65Kja6LwxHf)
+    }
+.dashed-zone-light {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuDqLRbzdi3m60nHT1i4fIwJH9fyYY0rIAHXYvaYf4w0PHpXO76-bYwKjzKVvN-J8-BukwoXHInEAC0V52pX-pzBT3M1NkqgmzxWiF25IF1bqJFw4DnUyXAI_nJl63_3p8b9wcAf_xl6qUL0utE1ICBxwP__341OU_OS5fSxSClHzYH25Kbwtq9ujcgyHNbpEGCNXmB9a2q_r2qOEsX3_VxKEUy7H7LXFcoCrLYI-UII10SsBy0yP_m0B18A14CF6OWEFsif2bVpBqJq)
+    }</style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-light dark:text-text-dark font-sans antialiased min-h-screen transition-colors duration-300 overflow-x-hidden">
+<header class="sticky top-0 z-40 bg-surface-light/95 dark:bg-surface-dark/95 backdrop-blur-md border-b border-border-light dark:border-border-dark px-6 py-4 shadow-soft">
+<div class="max-w-6xl mx-auto flex items-center justify-between">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4">
+<div class="text-2xl font-display font-semibold tracking-widest text-black dark:text-white">Medik8</div>
+<div class="h-6 w-px bg-border-light dark:bg-border-dark hidden md:block"></div>
+<div class="hidden md:flex flex-col leading-tight">
+<span class="text-[10px] uppercase tracking-widest text-gray-500 dark:text-text-muted">Localização</span>
+<span class="text-sm font-medium">Farmácia Central, Lisboa</span>
+</div>
+</div>
+</div>
+<div class="absolute left-1/2 top-1/2 transform -translate-x-1/2 hidden lg:flex items-center bg-background-light dark:bg-background-dark rounded-full p-1 border border-border-light dark:border-border-dark shadow-sm">
+<button class="p-1.5 rounded-full hover:bg-white dark:hover:bg-surface-dark transition-colors text-gray-500 dark:text-gray-400">
+<span class="material-symbols-outlined text-xl">chevron_left</span>
+</button>
+<div class="flex flex-col items-center px-6 min-w-[140px] cursor-pointer group">
+<span class="text-[10px] font-bold text-primary uppercase tracking-wider group-hover:underline">Hoje</span>
+<span class="text-sm font-bold text-text-light dark:text-text-dark">Qua, 25 Out</span>
+</div>
+<button class="p-1.5 rounded-full hover:bg-white dark:hover:bg-surface-dark transition-colors text-gray-500 dark:text-gray-400">
+<span class="material-symbols-outlined text-xl">chevron_right</span>
+</button>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex items-center bg-gray-100 dark:bg-background-dark border border-border-light dark:border-border-dark rounded-lg p-1 mr-2">
+<button class="px-2 py-1 text-xs font-bold rounded-md bg-white dark:bg-surface-dark text-black dark:text-white shadow-sm transition-all">PT</button>
+<button class="px-2 py-1 text-xs font-medium rounded-md text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white transition-all">EN</button>
+</div>
+<button aria-label="Toggle Theme" class="p-2 rounded-lg text-gray-500 dark:text-text-dark hover:bg-gray-100 dark:hover:bg-background-dark border border-transparent dark:border-border-dark transition-colors">
+<span class="material-symbols-outlined text-xl">light_mode</span>
+</button>
+<div class="h-6 w-px bg-border-light dark:bg-border-dark mx-1"></div>
+<button class="hidden md:flex items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wide text-text-light dark:text-text-dark bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors shadow-sm">
+<span class="material-symbols-outlined text-lg">print</span>
+                Imprimir
+            </button>
+<button class="flex items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wide text-white bg-primary rounded-lg hover:bg-primary-dark transition-colors shadow-sm">
+<span class="material-symbols-outlined text-lg">add</span>
+<span class="hidden sm:inline">Pausa Técnica</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-display font-bold text-xs border border-primary/30 ml-1">
+                SL
+            </div>
+</div>
+</div>
+</header>
+<main class="max-w-6xl mx-auto px-4 py-8 pb-32 flex gap-6 relative">
+<div class="flex-1 transition-all duration-300 pr-0 lg:pr-4">
+<div class="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+<div>
+<h1 class="font-display text-2xl md:text-3xl text-text-light dark:text-text-dark mb-1">Ficha de Marcações</h1>
+<p class="text-gray-500 dark:text-text-muted font-light text-sm">Momentos Personalizados • 45 minutos por sessão</p>
+</div>
+<div class="flex items-center gap-3 bg-white dark:bg-surface-dark py-2 px-4 rounded-lg border border-border-light dark:border-border-dark shadow-sm">
+<div class="h-9 w-9 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden ring-2 ring-primary/20">
+<img alt="Expert Avatar" class="h-full w-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVKGIbXO-UPO_QZ0YN8SsgHw_eyFGHlIQPDK7iQuytaRmQc-V0yyq2v0ARUbvusJJvYHBEeQhCrGqDB6bUfBxvuq3-Y2e4YDN4CGIGYnkhFUFIBLSPcr-0eXsUtafn3LQtrX1ftV6dUwWgpj3CH3GW0rUyB4KAMLUmdCGTqtHotqWUCjnAT2hQkOHkXv_5DZcXRzSmnCKvfzXW-92mIGmPfyd1R-8hivWAooSt0olefYjRGFR6nPRvyH6Lywc0zfnvrf_p3vpBRKEn"/>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] uppercase text-gray-500 dark:text-text-muted font-bold tracking-wider">Especialista de Pele</span>
+<span class="text-sm font-bold text-text-light dark:text-text-dark">Sofia Martinez</span>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-surface-dark rounded-xl shadow-soft border border-border-light dark:border-border-dark overflow-hidden relative">
+<div class="grid grid-cols-12 bg-gray-50 dark:bg-[#181818] border-b border-border-light dark:border-border-dark py-3 px-4 text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-text-muted sticky top-0 z-10">
+<div class="col-span-2 md:col-span-1">Hora</div>
+<div class="col-span-10 md:col-span-11 pl-4">Detalhes</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark min-h-[72px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark text-sm font-medium text-gray-400 dark:text-text-muted flex flex-col justify-between">
+<span>09:00</span>
+<span class="text-[10px] opacity-50">09:45</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2 relative">
+<div class="h-full w-full rounded-lg dashed-zone dark:dashed-zone flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors group">
+<span class="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wide group-hover:text-primary transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-lg">add_circle</span> Disponível
+                        </span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark min-h-[72px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark text-sm font-medium text-text-light dark:text-text-dark flex flex-col justify-between">
+<span>10:00</span>
+<span class="text-[10px] text-gray-400 dark:text-text-muted">10:45</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2">
+<div class="bg-slot-booked-light dark:bg-slot-booked-dark h-full w-full rounded-lg p-3 flex flex-col md:flex-row md:items-center justify-between border-l-4 border-blue-400 dark:border-blue-500 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+<div class="flex flex-col mb-2 md:mb-0">
+<span class="font-bold text-text-light dark:text-white text-sm">Maria Silva</span>
+<span class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1 font-medium">
+<span class="material-symbols-outlined text-[14px]">call</span> +351 912 345 678
+                            </span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-[10px] font-medium text-gray-500 dark:text-gray-400 hidden md:block italic">Primeira visita</span>
+<span class="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-200 text-[10px] font-bold uppercase tracking-wide border border-blue-200 dark:border-blue-800">Agendada</span>
+<button class="text-gray-400 hover:text-text-light dark:hover:text-white"><span class="material-symbols-outlined text-lg">more_vert</span></button>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark min-h-[72px] bg-primary/5 dark:bg-primary/5">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark text-sm font-bold text-primary dark:text-primary flex flex-col justify-between">
+<span>10:45</span>
+<span class="text-[10px] text-primary/70">11:30</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2">
+<div class="bg-white dark:bg-[#252525] border border-primary dark:border-primary h-full w-full rounded-lg p-3 flex flex-col md:flex-row md:items-center justify-between border-l-4 border-l-green-500 shadow-md relative overflow-hidden">
+<div class="absolute inset-0 bg-green-500/5 dark:bg-green-500/5 pointer-events-none"></div>
+<div class="flex flex-col mb-2 md:mb-0 relative z-10">
+<span class="font-bold text-text-light dark:text-white text-sm">Ana Costa</span>
+<span class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1 font-medium">
+<span class="material-symbols-outlined text-[14px]">mail</span> ana.costa@email.com
+                            </span>
+</div>
+<div class="flex items-center gap-3 relative z-10">
+<span class="px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-[10px] font-bold uppercase tracking-wide border border-green-200 dark:border-green-800">Check-in</span>
+<button class="text-text-light dark:text-white"><span class="material-symbols-outlined text-lg">edit</span></button>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark min-h-[24px]">
+<div class="col-span-2 md:col-span-1 py-2 px-4 border-r border-border-light/50 dark:border-border-dark text-xs font-medium text-gray-400 dark:text-text-muted">
+<span>11:30</span>
+</div>
+<div class="col-span-10 md:col-span-11 px-2 py-1">
+<div class="bg-lunch-light dark:bg-lunch-dark border border-primary/20 h-full w-full rounded flex items-center justify-center gap-2 cursor-grab active:cursor-grabbing opacity-80 hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-primary text-sm">coffee</span>
+<span class="text-[10px] font-bold text-primary uppercase tracking-wide">Pausa Técnica (15m)</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark min-h-[72px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark text-sm font-medium text-gray-400 dark:text-text-muted flex flex-col justify-between">
+<span>11:45</span>
+<span class="text-[10px] opacity-50">12:30</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2">
+<div class="h-full w-full rounded-lg dashed-zone dark:dashed-zone flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors group">
+<span class="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wide group-hover:text-primary transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-lg">add_circle</span> Disponível
+                        </span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-dashed border-primary/50 bg-primary/5 dark:bg-primary/10 min-h-[72px] relative overflow-hidden">
+<div class="absolute inset-0 pattern-diagonal-lines opacity-10"></div>
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark text-sm font-bold text-primary flex flex-col justify-between z-10">
+<span>12:30</span>
+<span class="text-[10px] opacity-80">13:15</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2 z-10 flex items-center justify-center">
+<span class="text-primary font-medium text-sm animate-pulse flex items-center gap-2">
+<span class="material-symbols-outlined">move_down</span>
+                        Largar para reagendar...
+                    </span>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark min-h-[96px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark text-sm font-medium text-gray-400 dark:text-text-muted flex flex-col justify-between">
+<span>13:15</span>
+<span class="text-[10px] opacity-50">14:15</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-0">
+<div class="bg-lunch-light dark:bg-lunch-dark h-full w-full flex flex-col items-center justify-center border-l-4 border-primary/40 relative group cursor-grab">
+<div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-primary">
+<span class="material-symbols-outlined">drag_indicator</span>
+</div>
+<span class="font-display text-lg tracking-widest text-text-light dark:text-text-dark font-medium">ALMOÇO</span>
+<span class="text-[10px] text-primary font-bold uppercase tracking-widest mt-1">60 Minutos</span>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark min-h-[72px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark text-sm font-medium text-text-light dark:text-text-dark flex flex-col justify-between">
+<span>14:15</span>
+<span class="text-[10px] text-gray-400 dark:text-text-muted">15:00</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2">
+<div class="bg-slot-booked-light dark:bg-slot-booked-dark h-full w-full rounded-lg p-3 flex flex-col md:flex-row md:items-center justify-between border-l-4 border-gray-400 dark:border-gray-500 shadow-sm cursor-pointer opacity-60 dark:opacity-50 grayscale hover:grayscale-0 transition-all">
+<div class="flex flex-col mb-2 md:mb-0">
+<span class="font-bold text-text-light dark:text-white text-sm line-through">Beatriz Santos</span>
+<span class="text-xs text-red-500 dark:text-red-400 font-medium mt-1">Cancelado pelo cliente</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-[10px] font-bold uppercase tracking-wide border border-gray-300 dark:border-gray-600">Cancelado</span>
+</div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-12 group border-b border-border-light/50 dark:border-border-dark min-h-[72px]">
+<div class="col-span-2 md:col-span-1 py-4 px-4 border-r border-border-light/50 dark:border-border-dark text-sm font-medium text-gray-400 dark:text-text-muted flex flex-col justify-between">
+<span>15:00</span>
+<span class="text-[10px] opacity-50">15:45</span>
+</div>
+<div class="col-span-10 md:col-span-11 p-2">
+<div class="h-full w-full rounded-lg dashed-zone dark:dashed-zone flex items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors group">
+<span class="text-xs text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wide group-hover:text-primary transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-lg">add_circle</span> Disponível
+                        </span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="fixed inset-y-0 right-0 w-96 bg-surface-light dark:bg-surface-dark border-l border-border-light dark:border-border-dark shadow-sidebar z-50 transform transition-transform duration-300 flex flex-col">
+<div class="flex items-center justify-between p-6 border-b border-border-light dark:border-border-dark">
+<h2 class="font-display text-lg font-semibold text-text-light dark:text-white tracking-wide">Editar Marcação</h2>
+<button class="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-6 space-y-6">
+<div class="space-y-2">
+<label class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-text-muted">Estado</label>
+<div class="flex flex-wrap gap-2">
+<button class="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors">Agendada</button>
+<button class="px-3 py-1.5 rounded-full text-xs font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 ring-1 ring-green-500 dark:ring-green-700">Check-in</button>
+<button class="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors">Concluída</button>
+<button class="px-3 py-1.5 rounded-full text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors">Faltou</button>
+</div>
+</div>
+<div class="space-y-4">
+<div class="space-y-1">
+<label class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-text-muted">Cliente</label>
+<div class="relative">
+<span class="absolute left-3 top-2.5 text-gray-400"><span class="material-symbols-outlined text-[18px]">person</span></span>
+<input class="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 dark:bg-[#121212] border border-border-light dark:border-border-dark rounded-lg text-text-light dark:text-white focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-colors" type="text" value="Ana Costa"/>
+</div>
+</div>
+<div class="space-y-1">
+<label class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-text-muted">Contacto</label>
+<div class="relative">
+<span class="absolute left-3 top-2.5 text-gray-400"><span class="material-symbols-outlined text-[18px]">mail</span></span>
+<input class="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 dark:bg-[#121212] border border-border-light dark:border-border-dark rounded-lg text-text-light dark:text-white focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-colors" type="email" value="ana.costa@email.com"/>
+</div>
+</div>
+<div class="space-y-1">
+<label class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-text-muted">Serviço</label>
+<div class="relative">
+<span class="absolute left-3 top-2.5 text-gray-400"><span class="material-symbols-outlined text-[18px]">spa</span></span>
+<select class="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 dark:bg-[#121212] border border-border-light dark:border-border-dark rounded-lg text-text-light dark:text-white focus:ring-1 focus:ring-primary focus:border-primary outline-none appearance-none cursor-pointer">
+<option>Consulta Anti-Aging (45m)</option>
+<option>Hidratação Profunda (45m)</option>
+<option>Acne Control (45m)</option>
+</select>
+<span class="absolute right-3 top-3 text-gray-400 pointer-events-none"><span class="material-symbols-outlined text-[16px]">expand_more</span></span>
+</div>
+</div>
+<div class="space-y-1">
+<label class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-text-muted">Notas</label>
+<textarea class="w-full p-3 text-sm bg-gray-50 dark:bg-[#121212] border border-border-light dark:border-border-dark rounded-lg text-text-light dark:text-white focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-colors resize-none placeholder-gray-500" placeholder="Adicionar notas sobre o cliente..." rows="4">Pele sensível a retinol. Preferência por produtos da gama Calmwise.</textarea>
+</div>
+</div>
+<div class="pt-4 border-t border-border-light dark:border-border-dark">
+<div class="flex justify-between text-xs text-gray-500 dark:text-gray-500">
+<span>Criado por: Sofia M.</span>
+<span>24 Out, 15:30</span>
+</div>
+</div>
+</div>
+<div class="p-6 border-t border-border-light dark:border-border-dark bg-gray-50 dark:bg-[#181818] flex gap-3">
+<button class="flex-1 py-2.5 text-sm font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 border border-transparent rounded-lg transition-colors">
+                Cancelar
+            </button>
+<button class="flex-[2] py-2.5 text-sm font-bold text-white bg-primary hover:bg-primary-dark shadow-md rounded-lg transition-colors">
+                Guardar Alterações
+            </button>
+</div>
+</div>
+<div class="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[90%] max-w-2xl z-40 animate-bounce-slight lg:mr-[192px] transition-all">
+<div class="bg-surface-light dark:bg-surface-dark rounded-xl shadow-float border border-primary/20 p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+<div class="flex items-center gap-3 w-full sm:w-auto">
+<div class="bg-primary/10 rounded-full p-2 text-primary shrink-0">
+<span class="material-symbols-outlined">edit_calendar</span>
+</div>
+<div>
+<p class="font-bold text-sm text-text-light dark:text-white">Agenda Atualizada</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">Reveja as alterações das 12:30.</p>
+</div>
+</div>
+<div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+<button class="px-4 py-2 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-lg transition-colors uppercase tracking-wide">
+                    Descartar
+                </button>
+<button class="px-4 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-dark shadow-md rounded-lg transition-colors uppercase tracking-wide">
+                    Aplicar
+                </button>
+</div>
+</div>
+</div>
+</main>
+<div class="fixed top-0 right-0 -z-10 opacity-30 dark:opacity-5 pointer-events-none">
+<svg fill="none" height="400" viewBox="0 0 400 400" width="400" xmlns="http://www.w3.org/2000/svg">
+<path d="M350 50 L400 0 M350 50 L300 100 M350 50 L400 100" stroke="#7B9E89" stroke-width="1"></path>
+<circle cx="300" cy="150" r="40" stroke="#7B9E89" stroke-width="1"></circle>
+<path d="M260 150 L220 150" stroke="#7B9E89" stroke-width="1"></path>
+<circle cx="180" cy="150" r="40" stroke="#7B9E89" stroke-width="1"></circle>
+</svg>
+</div>
+
+</body></html>

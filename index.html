@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Medik8 Skin Moments - Agenda Diária para Farmácias">
+  <meta name="theme-color" content="#7B9E89">
+
+  <title>Medik8 Skin Moments - Agenda Diária</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="./pwa/manifest.json">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Manrope:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+    rel="stylesheet">
+
+  <!-- Flatpickr -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./date-styles.css">
+  <link rel="stylesheet" href="./print.css" media="print">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="./assets/medik8-logo.svg">
+  <link rel="apple-touch-icon" href="./assets/icon-192.png">
+</head>
+
+<body>
+  <!-- Header -->
+  <header class="header" role="banner">
+    <div class="header__container">
+      <!-- Brand -->
+      <div class="header__brand">
+        <div class="header__logo">Medik8</div>
+        <div class="header__divider"></div>
+        <div class="header__pharmacy" id="pharmacySection">
+          <span class="header__pharmacy-label" data-i18n="pharmacy">Farmácia</span>
+          <div class="header__pharmacy-display">
+            <span class="header__pharmacy-value" id="pharmacyName">Farmácia Central, Lisboa</span>
+            <button class="header__edit-btn no-print" id="editPharmacyBtn" aria-label="Edit pharmacy">
+              <span class="material-symbols-outlined">edit</span>
+            </button>
+          </div>
+          <div class="header__pharmacy-edit hidden no-print" id="pharmacyEditMode">
+            <input type="text" class="header__pharmacy-input" id="pharmacyInput" placeholder="Nome da farmácia">
+            <button class="header__save-btn" id="savePharmacyBtn" data-i18n="save">Guardar</button>
+            <button class="header__cancel-btn" id="cancelPharmacyBtn" data-i18n="cancel">Cancelar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Date Navigator (centered) -->
+      <div class="header__date-nav">
+        <button class="header__date-btn" id="prevDayBtn" aria-label="Previous day">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <div class="header__date-nav-content">
+          <input type="date" id="datePicker" class="header__date-picker" aria-label="Select date">
+          <div class="header__date-info" id="dateDisplay">
+            <span class="header__date-label" data-i18n="today">Hoje</span>
+            <span class="header__date-value" id="currentDate">Qua, 25 Out</span>
+          </div>
+        </div>
+        <button class="header__date-btn" id="nextDayBtn" aria-label="Next day">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
+
+      <!-- Actions -->
+      <div class="header__actions">
+        <!-- Language Toggle -->
+        <div class="lang-toggle">
+          <button class="lang-toggle__btn active" id="langPT" data-lang="pt">PT</button>
+          <button class="lang-toggle__btn" id="langEN" data-lang="en">EN</button>
+        </div>
+
+        <!-- Theme Toggle -->
+        <button class="header__icon-btn" id="themeToggle" aria-label="Toggle theme">
+          <span class="material-symbols-outlined" id="themeIcon">dark_mode</span>
+        </button>
+
+        <div class="header__divider"></div>
+
+        <!-- Print Button -->
+        <button class="header__print-btn" id="printBtn">
+          <span class="material-symbols-outlined">print</span>
+          <span data-i18n="print">Imprimir</span>
+        </button>
+
+        <!-- Add Technical Break -->
+        <button class="header__add-break-btn" id="addTechBreakBtn">
+          <span class="material-symbols-outlined">add</span>
+          <span data-i18n="addTechBreak">Pausa Técnica</span>
+        </button>
+
+        <!-- User Avatar -->
+        <div class="header__avatar">
+          <img src="./assets/SKIN SELF LOVE_LOGO_HORIZONTAL_MANCHA_RGB.png" alt="Skin Self Love">
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main" id="mainContent">
+    <div class="schedule-container">
+      <!-- Page Header -->
+      <div class="page-header">
+        <div>
+          <h1 class="page-title" data-i18n="scheduleTitle">Ficha de Marcações</h1>
+          <p class="page-subtitle" data-i18n="scheduleSubtitle">Momentos Personalizados • 45 minutos por sessão</p>
+        </div>
+        <div class="expert-card" id="expertCard">
+          <div class="expert-avatar" id="expertAvatarContainer">
+            <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&h=100&fit=crop&crop=face"
+              alt="Expert Avatar" id="expertAvatarImg">
+            <input type="file" id="avatarUpload" accept="image/jpeg,image/png" class="hidden">
+          </div>
+          <div class="expert-info">
+            <span class="expert-label" data-i18n="skinExpert">Especialista de Pele</span>
+            <div class="expert-name-display">
+              <span class="expert-name" id="expertName">Sofia Martinez</span>
+              <button class="expert-edit-btn no-print" id="editExpertBtn" aria-label="Edit expert">
+                <span class="material-symbols-outlined">edit</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Expert Edit Modal -->
+      <div class="expert-modal hidden" id="expertModal">
+        <div class="expert-modal__content">
+          <h3 class="expert-modal__title" data-i18n="skinExpert">Especialista de Pele</h3>
+          <div class="expert-modal__avatar-section">
+            <div class="expert-modal__avatar" id="modalAvatarPreview">
+              <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&h=100&fit=crop&crop=face"
+                alt="Preview" id="modalAvatarImg">
+            </div>
+            <div class="expert-modal__avatar-actions no-print">
+              <button class="expert-modal__upload-btn" id="uploadPhotoBtn">
+                <span class="material-symbols-outlined">upload</span>
+                <span data-i18n="uploadPhoto">Carregar foto</span>
+              </button>
+              <button class="expert-modal__remove-btn" id="removePhotoBtn">
+                <span class="material-symbols-outlined">delete</span>
+                <span data-i18n="removePhoto">Remover foto</span>
+              </button>
+            </div>
+          </div>
+          <div class="expert-modal__field">
+            <label class="expert-modal__label" data-i18n="skinExpert">Nome</label>
+            <input type="text" class="expert-modal__input" id="expertNameInput" placeholder="Nome do especialista">
+          </div>
+          <div class="expert-modal__actions">
+            <button class="expert-modal__cancel-btn" id="cancelExpertBtn" data-i18n="cancel">Cancelar</button>
+            <button class="expert-modal__save-btn" id="saveExpertBtn" data-i18n="save">Guardar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Schedule Timeline -->
+      <div class="schedule" id="schedule">
+        <!-- Header Row -->
+        <div class="schedule__header">
+          <div data-i18n="time">Hora</div>
+          <div data-i18n="details">Detalhes</div>
+        </div>
+
+        <!-- Schedule rows will be rendered by JavaScript -->
+        <div id="scheduleBody"></div>
+      </div>
+
+      <!-- Needs Reschedule Section -->
+      <div class="reschedule-section" id="rescheduleSection">
+        <div class="reschedule-section__title">
+          <span class="material-symbols-outlined">warning</span>
+          <span data-i18n="needsReschedule">Necessita Reagendamento</span>
+        </div>
+        <ul class="reschedule-section__list" id="rescheduleList"></ul>
+      </div>
+    </div>
+  </main>
+
+  <!-- Edit Drawer -->
+  <aside class="drawer" id="drawer" role="dialog" aria-labelledby="drawerTitle">
+    <div class="drawer__header">
+      <h2 class="drawer__title" id="drawerTitle" data-i18n="editAppointment">Editar Marcação</h2>
+      <button class="drawer__close-btn" id="drawerClose" aria-label="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <div class="drawer__body">
+      <!-- Status Buttons -->
+      <div class="drawer__section">
+        <label class="drawer__label" data-i18n="status">Estado</label>
+        <div class="status-buttons" id="statusButtons">
+          <button class="status-btn" data-status="scheduled" data-i18n="scheduled">Agendada</button>
+          <button class="status-btn active" data-status="checked-in" data-i18n="checkedIn">Check-in</button>
+          <button class="status-btn" data-status="completed" data-i18n="completed">Concluída</button>
+          <button class="status-btn" data-status="no-show" data-i18n="noShow">Faltou</button>
+        </div>
+      </div>
+
+      <!-- Client Name -->
+      <div class="drawer__section">
+        <label class="drawer__label" data-i18n="client">Cliente</label>
+        <div class="drawer__input-group">
+          <span class="drawer__input-icon material-symbols-outlined">person</span>
+          <input type="text" class="drawer__input" id="clientName" placeholder="Nome do cliente">
+        </div>
+      </div>
+
+      <!-- Contact -->
+      <div class="drawer__section">
+        <label class="drawer__label" data-i18n="contact">Contacto</label>
+        <div class="drawer__input-group">
+          <span class="drawer__input-icon material-symbols-outlined">mail</span>
+          <input type="text" class="drawer__input" id="clientContact" placeholder="Email ou telefone">
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="drawer__section">
+        <label class="drawer__label" data-i18n="notes">Notas</label>
+        <textarea class="drawer__textarea" id="clientNotes" data-i18n-placeholder="notesPlaceholder"
+          placeholder="Adicionar notas sobre o cliente..."></textarea>
+      </div>
+    </div>
+
+    <div class="drawer__footer">
+      <button class="drawer__clear-btn" id="clearSlotBtn" data-i18n="cancel">Cancelar</button>
+      <button class="drawer__save-btn" id="saveSlotBtn" data-i18n="saveChanges">Guardar Alterações</button>
+    </div>
+  </aside>
+
+  <!-- Preview Bar -->
+  <div class="preview-bar" id="previewBar">
+    <div class="preview-bar__container">
+      <div class="preview-bar__info">
+        <div class="preview-bar__icon">
+          <span class="material-symbols-outlined">edit_calendar</span>
+        </div>
+        <div class="preview-bar__text">
+          <h3 data-i18n="scheduleUpdated">Agenda Atualizada</h3>
+          <p id="previewMessage"><span data-i18n="reviewChanges">Reveja as alterações das</span> 12:30.</p>
+        </div>
+      </div>
+      <div class="preview-bar__actions">
+        <button class="preview-bar__cancel-btn" id="previewCancel" data-i18n="discard">Descartar</button>
+        <button class="preview-bar__apply-btn" id="previewApply" data-i18n="apply">Aplicar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flatpickr JS -->
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+  <!-- Application Scripts -->
+  <script type="module" src="./app.js"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./pwa/service-worker.js')
+          .then(reg => console.log('SW registered:', reg.scope))
+          .catch(err => console.error('SW registration failed:', err));
+      });
+    }
+  </script>
+</body>
+
+</html>
