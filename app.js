@@ -221,9 +221,15 @@ async function saveScheduleToFirebase() {
 async function updateAvailabilityStatus(dateStr) {
     try {
         const { slots, appointments } = reflow(state.schedule);
-        const totalSlots = slots.length;
-        const bookedSlots = appointments.filter(a => a.isBooked).length;
-        const isFull = totalSlots > 0 && totalSlots === bookedSlots;
+        // With time-based appointments, 'slots' only contains EMPTY slots
+        // 'appointments' contains booked appointments
+        // Total potential slots = empty slots + booked appointments
+        const emptySlotCount = slots.length;
+        const bookedCount = appointments.filter(a => a.isBooked).length;
+        const totalPotentialSlots = emptySlotCount + bookedCount;
+
+        // Day is full only when there are no empty slots AND at least one booking
+        const isFull = emptySlotCount === 0 && bookedCount > 0;
 
         const monthKey = dateStr.substring(0, 7);
         const monthRef = doc(db, "month_availability", monthKey);
@@ -491,9 +497,12 @@ function renderSchedule() {
         elements.scheduleBody.appendChild(row);
     });
 
-    const totalSlots = slots.length;
-    const bookedSlots = appointments.filter(a => a.isBooked).length;
-    updateHeaderStatus(totalSlots > 0 && totalSlots === bookedSlots);
+    // With time-based appointments, 'slots' only contains EMPTY slots
+    const emptySlotCount = slots.length;
+    const bookedCount = appointments.filter(a => a.isBooked).length;
+    // Day is full only when there are no empty slots AND at least one booking
+    const isFull = emptySlotCount === 0 && bookedCount > 0;
+    updateHeaderStatus(isFull);
 
     renderRescheduleSection();
     attachDragHandlers();
