@@ -49,10 +49,21 @@ export function timeToTopPx(time) {
 }
 
 /**
- * Snap time to nearest increment
+ * Snap time to nearest increment (for visual drag feedback)
  */
 export function snapToGrid(minutes, increment = SNAP_INCREMENT) {
     return Math.round(minutes / increment) * increment;
+}
+
+/**
+ * Snap time to nearest slot boundary (45-min increments from day start)
+ * This ensures breaks don't create wasted time gaps
+ */
+export function snapToSlotBoundary(minutes) {
+    const dayStartMinutes = timeToMinutes(DAY_START);
+    const relativeMinutes = minutes - dayStartMinutes;
+    const snappedRelative = Math.round(relativeMinutes / SLOT_DURATION) * SLOT_DURATION;
+    return dayStartMinutes + snappedRelative;
 }
 
 /**
@@ -279,23 +290,41 @@ export function removeTechBreak(schedule, breakId) {
 }
 
 /**
- * Move lunch to a new start time
+ * Move lunch to a new start time (snapped to slot boundary)
  */
 export function moveLunch(schedule, newStart) {
+    // Snap to nearest slot boundary to avoid wasted time gaps
+    const newStartMin = timeToMinutes(newStart);
+    const snappedMin = snapToSlotBoundary(newStartMin);
+
+    // Ensure lunch stays within day bounds
+    const dayStartMin = timeToMinutes(DAY_START);
+    const dayEndMin = timeToMinutes(DAY_END);
+    const constrainedMin = Math.max(dayStartMin, Math.min(snappedMin, dayEndMin - LUNCH_DURATION));
+
     return {
         ...schedule,
-        lunchStart: newStart
+        lunchStart: minutesToTime(constrainedMin)
     };
 }
 
 /**
- * Move a tech break to a new start time
+ * Move a tech break to a new start time (snapped to slot boundary)
  */
 export function moveTechBreak(schedule, breakId, newStart) {
+    // Snap to nearest slot boundary
+    const newStartMin = timeToMinutes(newStart);
+    const snappedMin = snapToSlotBoundary(newStartMin);
+
+    // Ensure break stays within day bounds
+    const dayStartMin = timeToMinutes(DAY_START);
+    const dayEndMin = timeToMinutes(DAY_END);
+    const constrainedMin = Math.max(dayStartMin, Math.min(snappedMin, dayEndMin - TECH_BREAK_DURATION));
+
     return {
         ...schedule,
         techBreaks: schedule.techBreaks.map(tb =>
-            tb.id === breakId ? { ...tb, start: newStart } : tb
+            tb.id === breakId ? { ...tb, start: minutesToTime(constrainedMin) } : tb
         )
     };
 }
@@ -308,13 +337,18 @@ export function moveTechBreak(schedule, breakId, newStart) {
  * @param {string} [appointmentId] - Optional, for updating existing
  */
 export function bookAppointment(schedule, startTime, details, appointmentId = null) {
+    // Snap to nearest slot boundary
+    const startMin = timeToMinutes(startTime);
+    const snappedMin = snapToSlotBoundary(startMin);
+    const snappedTime = minutesToTime(snappedMin);
+
     if (appointmentId) {
         // Update existing appointment
         return {
             ...schedule,
             appointments: schedule.appointments.map(a =>
                 a.id === appointmentId
-                    ? { ...a, ...details, start: startTime, isBooked: true }
+                    ? { ...a, ...details, start: snappedTime, isBooked: true }
                     : a
             )
         };
@@ -323,7 +357,7 @@ export function bookAppointment(schedule, startTime, details, appointmentId = nu
     // Create new appointment
     const newApt = {
         id: generateId(),
-        start: startTime,
+        start: snappedTime,
         isBooked: true,
         name: details.name || '',
         contact: details.contact || '',
@@ -364,13 +398,18 @@ export function getAppointmentBySlot(schedule, slotIndex) {
 }
 
 /**
- * Move appointment to a new start time (like moving lunch)
+ * Move appointment to a new start time (snapped to slot boundary)
  */
 export function moveAppointment(schedule, appointmentId, newStartTime) {
+    // Snap to nearest slot boundary
+    const startMin = timeToMinutes(newStartTime);
+    const snappedMin = snapToSlotBoundary(startMin);
+    const snappedTime = minutesToTime(snappedMin);
+
     return {
         ...schedule,
         appointments: schedule.appointments.map(a =>
-            a.id === appointmentId ? { ...a, start: newStartTime } : a
+            a.id === appointmentId ? { ...a, start: snappedTime } : a
         )
     };
 }
