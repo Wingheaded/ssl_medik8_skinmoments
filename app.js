@@ -17,6 +17,10 @@ import {
     generateId,
     durationToPx,
     moveAppointment,
+    findValidTechBreakPosition,
+    timeToMinutes,
+    minutesToTime,
+    DAY_START,
     SLOT_DURATION,
     LUNCH_DURATION,
     TECH_BREAK_DURATION
@@ -771,17 +775,43 @@ function clearSlot() {
 // ==========================================
 
 function handleAddTechBreak() {
-    let newBreakTime = '11:30';
-    const lunchStart = state.schedule.lunchStart;
-    const lunchStartMin = parseInt(lunchStart.split(':')[0]) * 60 + parseInt(lunchStart.split(':')[1]);
-    const lunchEnd = lunchStartMin + LUNCH_DURATION;
-    const breakStartMin = 11 * 60 + 30;
+    const { appointments } = reflow(state.schedule);
+    const lunchStartMin = timeToMinutes(state.schedule.lunchStart);
+    const lunchEndMin = lunchStartMin + LUNCH_DURATION;
+    const dayStartMin = timeToMinutes(DAY_START);
 
-    if (breakStartMin >= lunchStartMin && breakStartMin < lunchEnd) {
-        const afterLunchHour = Math.floor(lunchEnd / 60);
-        const afterLunchMin = lunchEnd % 60;
-        newBreakTime = `${afterLunchHour.toString().padStart(2, '0')}:${afterLunchMin.toString().padStart(2, '0')}`;
+    // Find the end of the last booked appointment
+    // Filter for valid appointments that have a 'start' property and are booked
+    const bookedAppointments = appointments.filter(a => a.isBooked && a.start);
+
+    let insertPosition;
+
+    if (bookedAppointments.length > 0) {
+        // Sort by start time descending to find the last one
+        const sorted = bookedAppointments.sort((a, b) =>
+            timeToMinutes(b.start) - timeToMinutes(a.start)
+        );
+        const lastApt = sorted[0];
+        const lastAptEnd = timeToMinutes(lastApt.start) + SLOT_DURATION;
+
+        // Place tech break immediately after the last appointment
+        insertPosition = lastAptEnd;
+
+        // If that position is during lunch, place after lunch
+        if (insertPosition >= lunchStartMin && insertPosition < lunchEndMin) {
+            insertPosition = lunchEndMin;
+        }
+    } else {
+        // No appointments - place at a sensible default (mid-morning after 2 slots)
+        insertPosition = dayStartMin + (SLOT_DURATION * 2); // 10:30
+
+        // If that's during lunch, place after lunch
+        if (insertPosition >= lunchStartMin && insertPosition < lunchEndMin) {
+            insertPosition = lunchEndMin;
+        }
     }
+
+    const newBreakTime = minutesToTime(insertPosition);
 
     state.schedule = addTechBreak(state.schedule, newBreakTime);
     renderSchedule();
