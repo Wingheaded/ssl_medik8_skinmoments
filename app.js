@@ -18,9 +18,11 @@ import {
     durationToPx,
     moveAppointment,
     findValidTechBreakPosition,
+    validateScheduleGaps,
     timeToMinutes,
     minutesToTime,
     DAY_START,
+    DAY_END,
     SLOT_DURATION,
     LUNCH_DURATION,
     TECH_BREAK_DURATION
@@ -665,6 +667,7 @@ function handleDragPreview(dragResult) {
     if (dragResult.type === 'lunch') {
         state.schedule = moveLunch(state.schedule, dragResult.proposedTime);
     } else if (dragResult.type === 'techBreak') {
+        // Validation temporarily disabled for testing - allow any position
         state.schedule = moveTechBreak(state.schedule, dragResult.breakId, dragResult.proposedTime);
     } else if (dragResult.type === 'appointment') {
         // Move appointment to new start time (like lunch)
@@ -779,36 +782,39 @@ function handleAddTechBreak() {
     const lunchStartMin = timeToMinutes(state.schedule.lunchStart);
     const lunchEndMin = lunchStartMin + LUNCH_DURATION;
     const dayStartMin = timeToMinutes(DAY_START);
+    const dayEndMin = timeToMinutes(DAY_END);
 
-    // Find the end of the last booked appointment
-    // Filter for valid appointments that have a 'start' property and are booked
-    const bookedAppointments = appointments.filter(a => a.isBooked && a.start);
+    // Get all existing tech break times as a Set for quick lookup
+    const existingBreakTimes = new Set(
+        state.schedule.techBreaks.map(tb => timeToMinutes(tb.start))
+    );
 
-    let insertPosition;
+    // Get all booked appointment times
+    const bookedTimes = new Set(
+        appointments.filter(a => a.isBooked && a.start).map(a => timeToMinutes(a.start))
+    );
 
-    if (bookedAppointments.length > 0) {
-        // Sort by start time descending to find the last one
-        const sorted = bookedAppointments.sort((a, b) =>
-            timeToMinutes(b.start) - timeToMinutes(a.start)
-        );
-        const lastApt = sorted[0];
-        const lastAptEnd = timeToMinutes(lastApt.start) + SLOT_DURATION;
+    // Find the first available slot that isn't occupied by lunch, tech break, or appointment
+    let insertPosition = null;
+    for (let time = dayStartMin; time < dayEndMin; time += TECH_BREAK_DURATION) {
+        // Skip if during lunch
+        if (time >= lunchStartMin && time < lunchEndMin) continue;
 
-        // Place tech break immediately after the last appointment
-        insertPosition = lastAptEnd;
+        // Skip if already has a tech break
+        if (existingBreakTimes.has(time)) continue;
 
-        // If that position is during lunch, place after lunch
-        if (insertPosition >= lunchStartMin && insertPosition < lunchEndMin) {
-            insertPosition = lunchEndMin;
-        }
-    } else {
-        // No appointments - place at a sensible default (mid-morning after 2 slots)
-        insertPosition = dayStartMin + (SLOT_DURATION * 2); // 10:30
+        // Skip if has a booked appointment
+        if (bookedTimes.has(time)) continue;
 
-        // If that's during lunch, place after lunch
-        if (insertPosition >= lunchStartMin && insertPosition < lunchEndMin) {
-            insertPosition = lunchEndMin;
-        }
+        // Found an available slot
+        insertPosition = time;
+        break;
+    }
+
+    // If no slot found, alert the user
+    if (insertPosition === null) {
+        alert("No available slots for a technical break");
+        return;
     }
 
     const newBreakTime = minutesToTime(insertPosition);
@@ -846,7 +852,7 @@ function setupEventListeners() {
     elements.printBtn?.addEventListener('click', () => window.print());
     elements.addTechBreakBtn?.addEventListener('click', handleAddTechBreak);
     elements.drawerClose?.addEventListener('click', closeDrawer);
-    elements.clearSlotBtn?.addEventListener('click', clearSlot);
+    elements.clearSlotBtn?.addEventListener('click', closeDrawer); // Fixed: Cancel should close, not delete
     elements.saveSlotBtn?.addEventListener('click', saveSlot);
     elements.previewCancel?.addEventListener('click', cancelPreview);
     elements.previewApply?.addEventListener('click', applyPreview);

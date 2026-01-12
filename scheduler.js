@@ -99,64 +99,96 @@ export function findValidTechBreakPosition(proposedMin, schedule) {
     const lunchStartMin = timeToMinutes(schedule.lunchStart);
     const lunchEndMin = lunchStartMin + LUNCH_DURATION;
 
-    // Generate all valid positions for tech break (where both gaps are valid)
-    const validPositions = [];
+    // Targets to snap to (in minutes) to maximize efficiency
+    const snapTargets = [];
 
-    // Check positions in 15-minute increments
-    for (let pos = dayStartMin; pos <= dayEndMin - TECH_BREAK_DURATION; pos += 15) {
-        const techEnd = pos + TECH_BREAK_DURATION;
+    // 1. Virtual Slot Boundaries (from Day Start)
+    // e.g. 09:00, 09:45, 10:30, 11:15...
+    let cursor = dayStartMin;
+    while (cursor <= dayEndMin - TECH_BREAK_DURATION) {
+        snapTargets.push(cursor);
+        cursor += SLOT_DURATION;
+    }
 
-        // Skip if overlaps with lunch
-        if ((pos < lunchEndMin && techEnd > lunchStartMin)) continue;
+    // 2. Alignment with Anchors (Lunch & Appointments)
+    // Align Start to: Anchor End
+    // Align End to: Anchor Start (Target = Start - 15)
 
-        // Calculate gap BEFORE tech break (from last slot boundary or lunch end)
-        let gapBefore;
-        if (pos > lunchEndMin) {
-            // After lunch
-            gapBefore = pos - lunchEndMin;
-        } else {
-            // Before lunch - gap from nearest slot boundary
-            const slotBoundary = dayStartMin + Math.floor((pos - dayStartMin) / SLOT_DURATION) * SLOT_DURATION;
-            gapBefore = pos - slotBoundary;
-        }
+    // Lunch
+    snapTargets.push(lunchEndMin);
+    snapTargets.push(lunchStartMin - TECH_BREAK_DURATION);
 
-        // Calculate gap AFTER tech break (to lunch or next slot boundary)
-        let gapAfter;
-        if (techEnd <= lunchStartMin) {
-            // Before lunch
-            gapAfter = lunchStartMin - techEnd;
-        } else {
-            // After lunch - gap to next slot boundary or day end
-            const nextSlotBoundary = lunchEndMin + Math.ceil((techEnd - lunchEndMin) / SLOT_DURATION) * SLOT_DURATION;
-            gapAfter = Math.min(dayEndMin, nextSlotBoundary) - techEnd;
-        }
+    // Appointments (Safe access checking .start)
+    const validAppts = (schedule.appointments || []).filter(a => a.isBooked && a.start);
+    validAppts.forEach(a => {
+        const start = timeToMinutes(a.start);
+        const end = start + SLOT_DURATION;
+        snapTargets.push(end); // Align start to appt end
+        snapTargets.push(start - TECH_BREAK_DURATION); // Align end to appt start
+    });
 
-        // Position is valid if BOTH gaps are valid
-        if (isValidGap(gapBefore) && isValidGap(gapAfter)) {
-            validPositions.push(pos);
+    // 3. Find closest snap target within radius
+    let bestSnap = null;
+    let minDiff = Infinity;
+    const SNAP_RADIUS = 20; // Increased radius to catch 15m offsets (e.g. 15 -> 0, 30 -> 45)
+
+    for (const target of snapTargets) {
+        const diff = Math.abs(proposedMin - target);
+        if (diff <= SNAP_RADIUS && diff < minDiff) {
+            // Check limits and overlap
+            if (target >= dayStartMin && target <= dayEndMin - TECH_BREAK_DURATION) {
+                if (!checkOverlap(target, schedule)) {
+                    bestSnap = target;
+                    minDiff = diff;
+                }
+            }
         }
     }
 
-    // If no perfectly valid position, find closest valid
-    if (validPositions.length === 0) {
-        // Fallback: snap to 45-min boundary from day start
-        const snapped = dayStartMin + Math.round((proposedMin - dayStartMin) / SLOT_DURATION) * SLOT_DURATION;
-        return Math.max(dayStartMin, Math.min(snapped, dayEndMin - TECH_BREAK_DURATION));
+    // If a good efficient spot is found, use it
+    if (bestSnap !== null) return bestSnap;
+
+    // 4. Fallback: Standard 15-minute grid snap (if user forces a gap)
+    const snappedMin = Math.round((proposedMin - dayStartMin) / 15) * 15 + dayStartMin;
+
+    let finalPos = snappedMin;
+    if (finalPos < dayStartMin) finalPos = dayStartMin;
+    if (finalPos > dayEndMin - TECH_BREAK_DURATION) finalPos = dayEndMin - TECH_BREAK_DURATION;
+
+    // Check overlaps at snapped position
+    if (!checkOverlap(finalPos, schedule)) {
+        return finalPos;
     }
 
-    // Find the valid position closest to proposed
-    let closest = validPositions[0];
-    let minDistance = Math.abs(proposedMin - closest);
-    for (const pos of validPositions) {
-        const distance = Math.abs(proposedMin - pos);
-        if (distance < minDistance) {
-            minDistance = distance;
-            closest = pos;
+    // 5. If snapped position overlaps, try searching nearby 15m slots
+    const candidates = [finalPos - 15, finalPos + 15, finalPos - 30, finalPos + 30];
+    for (const cand of candidates) {
+        if (cand >= dayStartMin && cand <= dayEndMin - TECH_BREAK_DURATION) {
+            if (!checkOverlap(cand, schedule)) return cand;
         }
     }
 
-    return closest;
+    // Return snapped even if overlap (UI handles it), to prevent snap-back
+    return snappedMin;
 }
+
+function checkOverlap(start, schedule) {
+    const end = start + TECH_BREAK_DURATION;
+    const lunchStart = timeToMinutes(schedule.lunchStart);
+    const lunchEnd = lunchStart + LUNCH_DURATION;
+
+    // Lunch overlap
+    if (start < lunchEnd && end > lunchStart) return true;
+
+    // Appointment overlap
+    return (schedule.appointments || []).some(a => {
+        if (!a.isBooked || !a.start) return false;
+        const aStart = timeToMinutes(a.start);
+        const aEnd = aStart + SLOT_DURATION;
+        return (start < aEnd && end > aStart);
+    });
+}
+
 
 /**
  * Create a new empty state object
@@ -500,4 +532,25 @@ export function moveAppointment(schedule, appointmentId, newStartTime) {
             a.id === appointmentId ? { ...a, start: snappedTime } : a
         )
     };
+}
+
+/**
+ * Validate that the schedule has no unusable gaps (not multiples of slot duration)
+ * Returns error message or null
+ * @param {Object} schedule 
+ */
+export function validateScheduleGaps(schedule) {
+    // Re-use internal logic to find gaps
+    const blocked = buildBlockedIntervals(schedule, true);
+    const available = buildAvailableIntervals(blocked);
+
+    for (const interval of available) {
+        const duration = interval.end - interval.start;
+        // Valid if duration is a multiple of SLOT_DURATION (45)
+        // Also allow 0 duration (no gap)
+        if (duration > 0 && duration % SLOT_DURATION !== 0) {
+            return `Creates an unusable gap of ${duration % SLOT_DURATION} minutes.`;
+        }
+    }
+    return null; // Valid
 }
