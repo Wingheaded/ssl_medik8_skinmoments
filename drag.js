@@ -1,35 +1,39 @@
 /**
  * drag.js - Drag interactions with preview/apply mechanism
  * Uses Pointer Events for touch/mouse support
+ * Updated for position-based block model
  */
 
 import {
     timeToMinutes,
     minutesToTime,
-    snapToGrid,
     durationToPx,
     PX_PER_MINUTE,
     DAY_START,
     DAY_END,
     LUNCH_DURATION,
     TECH_BREAK_DURATION,
-    SLOT_DURATION
+    SLOT_DURATION,
+    getBlockDuration,
+    BLOCK_TYPES
 } from './scheduler.js';
 
 let isDragging = false;
 let dragTarget = null;
-let dragType = null; // 'lunch' or 'techBreak'
-let dragBreakId = null;
+let dragType = null; // 'lunch', 'techBreak', or 'appointment'
+let dragBlockId = null;
+let dragFromIndex = null; // Starting block index
 let startY = 0;
-let startTime = null;
-let currentTime = null;
+let startOffsetY = 0; // Offset within the block where drag started
+let scheduleTop = 0; // Top of schedule container
+let blockHeights = []; // Heights of each block for position calculation
 let onDragEnd = null;
 let onDragMove = null;
 
 /**
  * Initialize drag handlers
  * @param {Object} callbacks - Callback functions
- * @param {Function} callbacks.onPreview - Called when drag ends with proposed new time
+ * @param {Function} callbacks.onPreview - Called when drag ends with proposed position
  * @param {Function} callbacks.onDragUpdate - Called during drag with current position
  */
 export function initDrag(callbacks) {
@@ -40,17 +44,21 @@ export function initDrag(callbacks) {
 /**
  * Make an element draggable
  * @param {HTMLElement} element - Element to make draggable
- * @param {string} type - 'lunch' or 'techBreak'
+ * @param {string} type - 'lunch', 'techBreak', or 'appointment'
  * @param {string} startTimeStr - Current start time "HH:MM"
- * @param {string} [breakId] - Break ID for tech breaks
+ * @param {string} [blockId] - Block ID
+ * @param {number} [blockIndex] - Current block index in schedule
  */
-export function makeDraggable(element, type, startTimeStr, breakId = null) {
+export function makeDraggable(element, type, startTimeStr, blockId = null, blockIndex = null) {
     element.style.cursor = 'grab';
     element.setAttribute('data-draggable', 'true');
     element.setAttribute('data-drag-type', type);
     element.setAttribute('data-start-time', startTimeStr);
-    if (breakId) {
-        element.setAttribute('data-break-id', breakId);
+    if (blockId) {
+        element.setAttribute('data-block-id', blockId);
+    }
+    if (blockIndex !== null) {
+        element.setAttribute('data-block-index', String(blockIndex));
     }
 
     element.addEventListener('pointerdown', handlePointerDown);
@@ -65,8 +73,35 @@ export function removeDraggable(element) {
     element.removeAttribute('data-draggable');
     element.removeAttribute('data-drag-type');
     element.removeAttribute('data-start-time');
-    element.removeAttribute('data-break-id');
+    element.removeAttribute('data-block-id');
+    element.removeAttribute('data-block-index');
     element.removeEventListener('pointerdown', handlePointerDown);
+}
+
+/**
+ * Calculate block heights from all schedule rows
+ */
+function calculateBlockHeights() {
+    const rows = document.querySelectorAll('.schedule__row');
+    blockHeights = [];
+    rows.forEach(row => {
+        blockHeights.push(row.offsetHeight);
+    });
+    return blockHeights;
+}
+
+/**
+ * Calculate which block position corresponds to a Y coordinate
+ */
+function yToBlockPosition(y) {
+    let cumulative = 0;
+    for (let i = 0; i < blockHeights.length; i++) {
+        cumulative += blockHeights[i];
+        if (y < cumulative) {
+            return i;
+        }
+    }
+    return blockHeights.length - 1;
 }
 
 /**
@@ -78,7 +113,6 @@ function handlePointerDown(e) {
     if (e.button !== 0) return;
 
     // Don't intercept clicks on buttons (delete, clear, etc.)
-    // This allows button click events to propagate normally
     if (e.target.closest('button') || e.target.closest('.techbreak-block__delete-btn') || e.target.closest('.slot__clear-btn')) {
         return;
     }
@@ -87,10 +121,23 @@ function handlePointerDown(e) {
 
     dragTarget = e.currentTarget;
     dragType = dragTarget.getAttribute('data-drag-type');
-    dragBreakId = dragTarget.getAttribute('data-break-id');
-    startTime = dragTarget.getAttribute('data-start-time');
-    currentTime = startTime;
+    dragBlockId = dragTarget.getAttribute('data-block-id');
+    dragFromIndex = parseInt(dragTarget.getAttribute('data-block-index') || '0', 10);
     startY = e.clientY;
+
+    // Calculate block heights for position tracking
+    calculateBlockHeights();
+
+    // Get schedule container position
+    const scheduleBody = document.getElementById('scheduleBody');
+    if (scheduleBody) {
+        scheduleTop = scheduleBody.getBoundingClientRect().top;
+    }
+
+    // Calculate offset within the row
+    const targetRect = dragTarget.closest('.schedule__row')?.getBoundingClientRect();
+    startOffsetY = targetRect ? e.clientY - targetRect.top : 0;
+
     isDragging = true;
 
     // Visual feedback
@@ -115,46 +162,24 @@ function handlePointerMove(e) {
     if (!isDragging) return;
 
     const deltaY = e.clientY - startY;
-    const deltaMinutes = Math.round(deltaY / PX_PER_MINUTE);
 
-    // Calculate new time
-    const startMinutes = timeToMinutes(startTime);
-    let newMinutes = startMinutes + deltaMinutes;
+    // Calculate relative Y within schedule
+    const relativeY = e.clientY - scheduleTop;
 
-    // Snap to grid
-    newMinutes = snapToGrid(newMinutes);
-
-    // Get duration based on type
-    let duration;
-    if (dragType === 'lunch') {
-        duration = LUNCH_DURATION;
-    } else if (dragType === 'techBreak') {
-        duration = TECH_BREAK_DURATION;
-    } else if (dragType === 'appointment') {
-        duration = SLOT_DURATION;
-    }
-
-    // Constrain to day bounds
-    const dayStartMin = timeToMinutes(DAY_START);
-    const dayEndMin = timeToMinutes(DAY_END);
-
-    newMinutes = Math.max(dayStartMin, newMinutes);
-    newMinutes = Math.min(dayEndMin - duration, newMinutes);
-
-    currentTime = minutesToTime(newMinutes);
+    // Find target block position
+    const targetIndex = yToBlockPosition(relativeY);
 
     // Notify about drag position
     onDragMove({
         type: dragType,
-        breakId: dragBreakId,
-        originalTime: startTime,
-        currentTime: currentTime,
+        blockId: dragBlockId,
+        fromIndex: dragFromIndex,
+        currentIndex: targetIndex,
         deltaY: deltaY
     });
 
-    // Visual feedback with transform (keep in place, show ghost elsewhere)
-    const offsetY = (newMinutes - startMinutes) * PX_PER_MINUTE;
-    dragTarget.style.transform = `translateY(${offsetY}px)`;
+    // Visual feedback with transform
+    dragTarget.style.transform = `translateY(${deltaY}px)`;
 }
 
 /**
@@ -180,24 +205,29 @@ function handlePointerUp(e) {
     document.removeEventListener('pointerup', handlePointerUp);
     document.removeEventListener('pointercancel', handlePointerUp);
 
+    // Calculate final position
+    const relativeY = e.clientY - scheduleTop;
+    const toIndex = yToBlockPosition(relativeY);
+
     // Check if position actually changed
-    if (currentTime !== startTime) {
+    if (toIndex !== dragFromIndex) {
         // Trigger preview mode with proposed changes
         onDragEnd({
             type: dragType,
-            breakId: dragBreakId,
-            originalTime: startTime,
-            proposedTime: currentTime
+            blockId: dragBlockId,
+            fromIndex: dragFromIndex,
+            toIndex: toIndex
         });
     }
 
     // Reset state
     dragTarget = null;
     dragType = null;
-    dragBreakId = null;
-    startTime = null;
-    currentTime = null;
+    dragBlockId = null;
+    dragFromIndex = null;
     startY = 0;
+    startOffsetY = 0;
+    blockHeights = [];
 }
 
 /**
@@ -214,10 +244,11 @@ export function cancelDrag() {
     isDragging = false;
     dragTarget = null;
     dragType = null;
-    dragBreakId = null;
-    startTime = null;
-    currentTime = null;
+    dragBlockId = null;
+    dragFromIndex = null;
     startY = 0;
+    startOffsetY = 0;
+    blockHeights = [];
 
     document.removeEventListener('pointermove', handlePointerMove);
     document.removeEventListener('pointerup', handlePointerUp);

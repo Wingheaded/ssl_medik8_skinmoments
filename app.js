@@ -17,19 +17,38 @@ import {
     generateId,
     durationToPx,
     moveAppointment,
-    findValidTechBreakPosition,
-    validateScheduleGaps,
+    moveBlock,
+    findBlockIndex,
+    insertBlock,
+    removeBlock,
+    pixelToBlockPosition,
     timeToMinutes,
     minutesToTime,
     DAY_START,
     DAY_END,
     SLOT_DURATION,
     LUNCH_DURATION,
-    TECH_BREAK_DURATION
+    TECH_BREAK_DURATION,
+    BLOCK_TYPES
 } from './scheduler.js';
 import { initDrag, makeDraggable, cancelDrag } from './drag.js';
 import { db } from './firebase-config.js';
 import { doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
+// ==========================================
+// Date Utilities
+// ==========================================
+
+/**
+ * Format a date to YYYY-MM-DD using local timezone (avoids toISOString() drift)
+ */
+function formatLocalDate(date) {
+    const d = date instanceof Date ? date : new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
 
 // ==========================================
 // State Management
@@ -42,7 +61,7 @@ const EXPERT_AVATAR_KEY = 'ssl_skinExpertAvatar';
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&h=100&fit=crop&crop=face';
 
 let state = createInitialState();
-state.date = new Date().toISOString().split('T')[0];
+state.date = formatLocalDate(new Date());
 
 let committedSchedule = null;
 let unsubscribeSnapshot = null;
@@ -406,7 +425,7 @@ function updateDateDisplay() {
         elements.currentDate.textContent = `${weekdays[dateObj.getDay()]}, ${dateObj.getDate()} ${months[dateObj.getMonth()]}`;
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = formatLocalDate(new Date());
     const dateLabel = document.querySelector('.header__date-label');
     if (dateLabel) {
         dateLabel.textContent = state.date === todayStr ? t('today') : '';
@@ -431,13 +450,13 @@ async function changeDate(newDateStr) {
 function handlePrevDay() {
     const date = new Date(state.date);
     date.setDate(date.getDate() - 1);
-    changeDate(date.toISOString().split('T')[0]);
+    changeDate(formatLocalDate(date));
 }
 
 function handleNextDay() {
     const date = new Date(state.date);
     date.setDate(date.getDate() + 1);
-    changeDate(date.toISOString().split('T')[0]);
+    changeDate(formatLocalDate(date));
 }
 
 function initFlatpickr() {
@@ -461,7 +480,7 @@ function initFlatpickr() {
             instance.redraw();
         },
         onDayCreate: (dObj, dStr, fp, dayElem) => {
-            const dateStr = dayElem.dateObj.toISOString().split('T')[0];
+            const dateStr = formatLocalDate(dayElem.dateObj);
             const monthKey = dateStr.substring(0, 7);
             if (availabilityCache[monthKey]?.[dateStr] === 'full') {
                 dayElem.classList.add('day-full');
@@ -492,8 +511,9 @@ async function fetchMonthAvailability(monthKey, forceRefresh = false) {
 function renderSchedule() {
     const { scheduleItems, slots, appointments, needsReschedule } = reflow(state.schedule);
 
-    state.schedule.appointments = appointments;
+    // Store computed values (don't overwrite schedule.appointments)
     state.computed.slots = slots;
+    state.computed.appointments = appointments;
     state.needsReschedule = needsReschedule;
 
     elements.scheduleBody.innerHTML = '';
@@ -503,10 +523,9 @@ function renderSchedule() {
         elements.scheduleBody.appendChild(row);
     });
 
-    // With time-based appointments, 'slots' only contains EMPTY slots
+    // Day is full when no empty slots AND at least one booking
     const emptySlotCount = slots.length;
-    const bookedCount = appointments.filter(a => a.isBooked).length;
-    // Day is full only when there are no empty slots AND at least one booking
+    const bookedCount = appointments.length;
     const isFull = emptySlotCount === 0 && bookedCount > 0;
     updateHeaderStatus(isFull);
 
@@ -636,25 +655,33 @@ function renderRescheduleSection() {
 // ==========================================
 
 function attachDragHandlers() {
+    // Get reflowed schedule to know block positions and times
+    const { scheduleItems } = reflow(state.schedule);
+
+    // Attach drag handler to lunch block
     const lunchBlock = document.getElementById('lunchBlock');
     if (lunchBlock) {
-        makeDraggable(lunchBlock, 'lunch', state.schedule.lunchStart);
+        const lunchItem = scheduleItems.find(item => item.type === 'lunch');
+        if (lunchItem) {
+            makeDraggable(lunchBlock, 'lunch', lunchItem.start, 'lunch', lunchItem.blockIndex);
+        }
     }
 
+    // Attach drag handlers to tech breaks
     document.querySelectorAll('.techbreak-block').forEach(block => {
         const breakId = block.getAttribute('data-break-id');
-        const breakData = state.schedule.techBreaks.find(tb => tb.id === breakId);
-        if (breakData) {
-            makeDraggable(block, 'techBreak', breakData.start, breakId);
+        const breakItem = scheduleItems.find(item => item.id === breakId && item.type === 'techBreak');
+        if (breakItem) {
+            makeDraggable(block, 'techBreak', breakItem.start, breakId, breakItem.blockIndex);
         }
     });
 
-    // Attach drag handlers to booked appointments using ID
+    // Attach drag handlers to booked appointments
     document.querySelectorAll('.slot--booked').forEach(slot => {
         const appointmentId = slot.dataset.appointmentId;
-        const startTime = slot.dataset.startTime;
-        if (appointmentId && startTime) {
-            makeDraggable(slot, 'appointment', startTime, appointmentId);
+        const aptItem = scheduleItems.find(item => item.id === appointmentId);
+        if (aptItem) {
+            makeDraggable(slot, 'appointment', aptItem.start, appointmentId, aptItem.blockIndex);
         }
     });
 }
@@ -664,21 +691,26 @@ function handleDragPreview(dragResult) {
         committedSchedule = JSON.parse(JSON.stringify(state.schedule));
     }
 
-    if (dragResult.type === 'lunch') {
-        state.schedule = moveLunch(state.schedule, dragResult.proposedTime);
+    // dragResult now contains: type, blockId, fromIndex, toIndex (position-based)
+    if (dragResult.toIndex !== undefined && dragResult.fromIndex !== undefined) {
+        // Position-based move
+        state.schedule = moveBlock(state.schedule, dragResult.fromIndex, dragResult.toIndex);
+    } else if (dragResult.type === 'lunch') {
+        // Legacy time-based (fallback)
+        state.schedule = moveLunch(state.schedule, dragResult.toIndex || 0);
     } else if (dragResult.type === 'techBreak') {
-        // Validation temporarily disabled for testing - allow any position
-        state.schedule = moveTechBreak(state.schedule, dragResult.breakId, dragResult.proposedTime);
-    } else if (dragResult.type === 'appointment') {
-        // Move appointment to new start time (like lunch)
-        const appointmentId = dragResult.breakId;
-        state.schedule = moveAppointment(state.schedule, appointmentId, dragResult.proposedTime);
+        state.schedule = moveTechBreak(state.schedule, dragResult.breakId, dragResult.toIndex || 0);
     }
 
     state.ui.previewMode = true;
 
+    // Show preview message with the new calculated time
+    const { scheduleItems } = reflow(state.schedule);
+    const movedItem = scheduleItems[dragResult.toIndex];
+    const newTime = movedItem ? movedItem.start : '';
+
     if (elements.previewMessage) {
-        elements.previewMessage.innerHTML = `${t('reviewChanges')} ${dragResult.proposedTime}.`;
+        elements.previewMessage.innerHTML = `${t('reviewChanges')} ${newTime}.`;
     }
 
     elements.previewBar?.classList.add('visible');
@@ -778,48 +810,9 @@ function clearSlot() {
 // ==========================================
 
 function handleAddTechBreak() {
-    const { appointments } = reflow(state.schedule);
-    const lunchStartMin = timeToMinutes(state.schedule.lunchStart);
-    const lunchEndMin = lunchStartMin + LUNCH_DURATION;
-    const dayStartMin = timeToMinutes(DAY_START);
-    const dayEndMin = timeToMinutes(DAY_END);
-
-    // Get all existing tech break times as a Set for quick lookup
-    const existingBreakTimes = new Set(
-        state.schedule.techBreaks.map(tb => timeToMinutes(tb.start))
-    );
-
-    // Get all booked appointment times
-    const bookedTimes = new Set(
-        appointments.filter(a => a.isBooked && a.start).map(a => timeToMinutes(a.start))
-    );
-
-    // Find the first available slot that isn't occupied by lunch, tech break, or appointment
-    let insertPosition = null;
-    for (let time = dayStartMin; time < dayEndMin; time += TECH_BREAK_DURATION) {
-        // Skip if during lunch
-        if (time >= lunchStartMin && time < lunchEndMin) continue;
-
-        // Skip if already has a tech break
-        if (existingBreakTimes.has(time)) continue;
-
-        // Skip if has a booked appointment
-        if (bookedTimes.has(time)) continue;
-
-        // Found an available slot
-        insertPosition = time;
-        break;
-    }
-
-    // If no slot found, alert the user
-    if (insertPosition === null) {
-        alert("No available slots for a technical break");
-        return;
-    }
-
-    const newBreakTime = minutesToTime(insertPosition);
-
-    state.schedule = addTechBreak(state.schedule, newBreakTime);
+    // With the new ordered block model, insert a tech break at position 1
+    // (after the first slot, effectively at the beginning of the day)
+    state.schedule = addTechBreak(state.schedule, 1);
     renderSchedule();
     saveScheduleToFirebase();
 }
