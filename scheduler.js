@@ -135,6 +135,77 @@ export function createInitialState() {
 }
 
 /**
+ * Migrate old schedule format to new blocks format
+ * Old format: { lunchStart, techBreaks, appointments (by time) }
+ * New format: { blocks, appointments (by blockId) }
+ */
+function migrateOldScheduleFormat(schedule) {
+    const dayStartMin = timeToMinutes(DAY_START);
+    const dayEndMin = timeToMinutes(DAY_END);
+
+    // Already has blocks array
+    if (schedule.blocks && Array.isArray(schedule.blocks)) {
+        // Validate there's only one lunch
+        const lunchCount = schedule.blocks.filter(b => b.type === BLOCK_TYPES.LUNCH).length;
+
+        if (lunchCount > 1) {
+            // Fix corrupted data - keep only first lunch
+            let foundLunch = false;
+            schedule.blocks = schedule.blocks.filter(b => {
+                if (b.type === BLOCK_TYPES.LUNCH) {
+                    if (foundLunch) return false;
+                    foundLunch = true;
+                }
+                return true;
+            });
+        }
+
+        // Pad schedule with slots to fill the full day
+        let currentMinutes = 0;
+        for (const block of schedule.blocks) {
+            currentMinutes += getBlockDuration(block.type);
+        }
+
+        const totalDayMinutes = dayEndMin - dayStartMin;
+        while (currentMinutes + SLOT_DURATION <= totalDayMinutes) {
+            schedule.blocks.push({
+                type: BLOCK_TYPES.SLOT,
+                id: generateId()
+            });
+            currentMinutes += SLOT_DURATION;
+        }
+
+        // Ensure there's at least one lunch block
+        if (lunchCount === 0) {
+            // Insert lunch at position 4 (or end if less blocks)
+            const lunchPos = Math.min(4, schedule.blocks.length);
+            schedule.blocks.splice(lunchPos, 0, {
+                type: BLOCK_TYPES.LUNCH,
+                id: 'lunch'
+            });
+        }
+
+        return schedule;
+    }
+
+    // Create fresh blocks for old/invalid data
+    const blocks = createDefaultBlocks(4);
+
+    // Migrate appointments if they exist (old format used time as key)
+    const newAppointments = {};
+    if (schedule.appointments) {
+        // Old appointments were keyed by time - need to map to block IDs
+        // For simplicity, just reset appointments on migration
+        // (old format is incompatible)
+    }
+
+    return {
+        blocks,
+        appointments: newAppointments
+    };
+}
+
+/**
  * Main reflow function - calculate times from block order
  * @param {Object} schedule - Contains blocks and appointments
  * @returns {Object} - scheduleItems with calculated times
@@ -143,11 +214,10 @@ export function reflow(schedule) {
     const dayStartMin = timeToMinutes(DAY_START);
     const dayEndMin = timeToMinutes(DAY_END);
 
-    // Ensure schedule has blocks (fallback for old data or fresh state)
-    if (!schedule.blocks || !Array.isArray(schedule.blocks)) {
-        schedule.blocks = createDefaultBlocks(4);
-        schedule.appointments = {};
-    }
+    // Migrate old data format if needed
+    const migratedSchedule = migrateOldScheduleFormat(schedule);
+    schedule.blocks = migratedSchedule.blocks;
+    schedule.appointments = migratedSchedule.appointments || schedule.appointments || {};
 
     const scheduleItems = [];
     const slots = [];
