@@ -561,8 +561,8 @@ function createScheduleRow(item, appointments) {
         // Booked appointment (time-based block)
         contentCol.innerHTML = createBookedSlot(item.data, item.start);
     } else {
-        // Empty slot
-        contentCol.innerHTML = createAvailableSlot(item.start);
+        // Empty slot - pass blockId for booking
+        contentCol.innerHTML = createAvailableSlot(item.start, item.id);
     }
 
     row.appendChild(timeCol);
@@ -592,9 +592,9 @@ function createTechBreakBlock(breakId) {
   `;
 }
 
-function createAvailableSlot(startTime) {
+function createAvailableSlot(startTime, blockId) {
     return `
-    <div class="slot--available" data-slot-start="${startTime}">
+    <div class="slot--available" data-slot-start="${startTime}" data-block-id="${blockId}">
       <span class="slot--available__text">
         <span class="material-symbols-outlined">add_circle</span>
         ${t('available')}
@@ -743,12 +743,12 @@ function cancelPreview() {
 // Drawer (Edit Panel)
 // ==========================================
 
-function openDrawer(appointmentId, startTime) {
-    state.ui.selectedSlotId = appointmentId; // Now stores appointment ID or null for new
+function openDrawer(blockId, startTime) {
+    state.ui.selectedSlotId = blockId; // Block ID for new or existing
     state.ui.selectedTime = startTime;
     state.ui.drawerOpen = true;
 
-    const apt = appointmentId ? getAppointmentById(state.schedule, appointmentId) : null;
+    const apt = blockId ? getAppointmentById(state.schedule, blockId) : null;
 
     if (elements.clientName) elements.clientName.value = apt?.name || '';
     if (elements.clientContact) elements.clientContact.value = apt?.contact || '';
@@ -773,8 +773,8 @@ function closeDrawer() {
 
 function saveSlot() {
     const startTime = state.ui.selectedTime;
-    const appointmentId = state.ui.selectedSlotId;
-    if (!startTime) return;
+    const blockId = state.ui.selectedSlotId;
+    if (!startTime || !blockId) return;
 
     const name = elements.clientName?.value.trim() || '';
     const contact = elements.clientContact?.value.trim() || '';
@@ -782,12 +782,12 @@ function saveSlot() {
     const activeStatusBtn = elements.statusButtons?.querySelector('.status-btn.active');
     const status = activeStatusBtn?.dataset.status || 'scheduled';
 
-    if (!name && appointmentId) {
+    if (!name && blockId) {
         // Clear existing appointment if name is empty
-        state.schedule = clearAppointment(state.schedule, appointmentId);
-    } else if (name) {
-        // Book or update appointment
-        state.schedule = bookAppointment(state.schedule, startTime, { name, contact, notes, status }, appointmentId);
+        state.schedule = clearAppointment(state.schedule, blockId);
+    } else if (name && blockId) {
+        // Book or update appointment using blockId
+        state.schedule = bookAppointment(state.schedule, blockId, { name, contact, notes, status });
     }
 
     closeDrawer();
@@ -887,8 +887,9 @@ function setupEventListeners() {
         // Click on available slot to add new
         const availableSlot = e.target.closest('.slot--available');
         if (availableSlot) {
+            const blockId = availableSlot.dataset.blockId;
             const startTime = availableSlot.dataset.slotStart;
-            openDrawer(null, startTime);
+            openDrawer(blockId, startTime);
             return;
         }
     });
