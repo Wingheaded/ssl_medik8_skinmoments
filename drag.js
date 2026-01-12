@@ -37,7 +37,7 @@ let onDragMove = null;
  * @param {Function} callbacks.onDragUpdate - Called during drag with current position
  */
 export function initDrag(callbacks) {
-    onDragEnd = callbacks.onPreview || (() => { });
+    onDragEnd = callbacks.onDragEnd || (() => { });
     onDragMove = callbacks.onDragUpdate || (() => { });
 }
 

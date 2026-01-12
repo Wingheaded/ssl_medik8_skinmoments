@@ -63,7 +63,8 @@ const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1580489944761-15a19d65
 let state = createInitialState();
 state.date = formatLocalDate(new Date());
 
-let committedSchedule = null;
+state.date = formatLocalDate(new Date());
+
 let unsubscribeSnapshot = null;
 let flatpickrInstance = null;
 let availabilityCache = {};
@@ -131,7 +132,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateDateDisplay();
 
     initDrag({
-        onPreview: handleDragPreview,
+        onDragEnd: handleDragEnd,
         onDragUpdate: handleDragUpdate
     });
 
@@ -221,7 +222,7 @@ async function loadScheduleFromFirebase() {
         }
 
         unsubscribeSnapshot = onSnapshot(doc(db, "schedules", docId), (docSnapshot) => {
-            if (docSnapshot.exists() && !state.ui.previewMode) {
+            if (docSnapshot.exists()) {
                 state.schedule = docSnapshot.data();
                 renderSchedule();
                 updateAvailabilityStatus(docId);
@@ -686,58 +687,33 @@ function attachDragHandlers() {
     });
 }
 
-function handleDragPreview(dragResult) {
-    if (!state.ui.previewMode) {
-        committedSchedule = JSON.parse(JSON.stringify(state.schedule));
-    }
+function handleDragEnd(dragResult) {
+    let scheduleChanged = false;
 
     // dragResult now contains: type, blockId, fromIndex, toIndex (position-based)
     if (dragResult.toIndex !== undefined && dragResult.fromIndex !== undefined) {
         // Position-based move
         state.schedule = moveBlock(state.schedule, dragResult.fromIndex, dragResult.toIndex);
+        scheduleChanged = true;
     } else if (dragResult.type === 'lunch') {
         // Legacy time-based (fallback)
         state.schedule = moveLunch(state.schedule, dragResult.toIndex || 0);
+        scheduleChanged = true;
     } else if (dragResult.type === 'techBreak') {
         state.schedule = moveTechBreak(state.schedule, dragResult.breakId, dragResult.toIndex || 0);
+        scheduleChanged = true;
     }
 
-    state.ui.previewMode = true;
-
-    // Show preview message with the new calculated time
-    const { scheduleItems } = reflow(state.schedule);
-    const movedItem = scheduleItems[dragResult.toIndex];
-    const newTime = movedItem ? movedItem.start : '';
-
-    if (elements.previewMessage) {
-        elements.previewMessage.innerHTML = `${t('reviewChanges')} ${newTime}.`;
+    if (scheduleChanged) {
+        renderSchedule();
+        saveScheduleToFirebase();
     }
-
-    elements.previewBar?.classList.add('visible');
-    renderSchedule();
 }
 
 function handleDragUpdate(dragData) {
     // Visual feedback during drag (optional)
 }
-
-function applyPreview() {
-    committedSchedule = null;
-    state.ui.previewMode = false;
-    elements.previewBar?.classList.remove('visible');
-    renderSchedule();
-    saveScheduleToFirebase();
-}
-
-function cancelPreview() {
-    if (committedSchedule) {
-        state.schedule = committedSchedule;
-        committedSchedule = null;
-    }
-    state.ui.previewMode = false;
-    elements.previewBar?.classList.remove('visible');
-    renderSchedule();
-}
+// applyPreview and cancelPreview removed as confirmation is no longer required
 
 // ==========================================
 // Drawer (Edit Panel)
@@ -847,8 +823,6 @@ function setupEventListeners() {
     elements.drawerClose?.addEventListener('click', closeDrawer);
     elements.clearSlotBtn?.addEventListener('click', closeDrawer); // Fixed: Cancel should close, not delete
     elements.saveSlotBtn?.addEventListener('click', saveSlot);
-    elements.previewCancel?.addEventListener('click', cancelPreview);
-    elements.previewApply?.addEventListener('click', applyPreview);
 
     elements.statusButtons?.addEventListener('click', (e) => {
         const btn = e.target.closest('.status-btn');
@@ -897,7 +871,6 @@ function setupEventListeners() {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             if (state.ui.drawerOpen) closeDrawer();
-            if (state.ui.previewMode) cancelPreview();
             if (!elements.expertModal?.classList.contains('hidden')) closeExpertModal();
             if (!elements.pharmacyEditMode?.classList.contains('hidden')) closePharmacyEdit();
         }
@@ -921,6 +894,5 @@ function setupEventListeners() {
 // ==========================================
 
 window.SkinMoments = {
-    getState: () => state,
-    getCommittedSchedule: () => committedSchedule
+    getState: () => state
 };
