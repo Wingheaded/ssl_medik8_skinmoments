@@ -39,6 +39,8 @@
     "notesPlaceholder": "Add notes about the client...",
     "createdBy": "Created by",
     "clearSlot": "Clear Slot",
+    "confirmDelete": "Delete Appointment?",
+    "confirmDeleteMessage": "This action cannot be undone.",
     "delete": "Delete",
     "edit": "Edit",
     "save": "Save",

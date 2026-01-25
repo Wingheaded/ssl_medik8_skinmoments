@@ -263,6 +263,24 @@
     </div>
   </div>
 
+  <!-- Confirmation Modal -->
+  <div class="confirm-modal hidden" id="confirmModal" role="dialog" aria-modal="true"
+    aria-labelledby="confirmModalTitle">
+    <div class="confirm-modal__backdrop"></div>
+    <div class="confirm-modal__content">
+      <div class="confirm-modal__icon">
+        <span class="material-symbols-outlined">delete</span>
+      </div>
+      <h3 class="confirm-modal__title" id="confirmModalTitle" data-i18n="confirmDelete">Apagar Marcação?</h3>
+      <p class="confirm-modal__message" id="confirmModalMessage" data-i18n="confirmDeleteMessage">Esta ação não pode ser
+        revertida.</p>
+      <div class="confirm-modal__actions">
+        <button class="confirm-modal__cancel-btn" id="confirmModalCancel" data-i18n="cancel">Cancelar</button>
+        <button class="confirm-modal__confirm-btn" id="confirmModalConfirm" data-i18n="delete">Apagar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Flatpickr JS -->
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 

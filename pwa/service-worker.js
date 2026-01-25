@@ -1,4 +1,4 @@
-const CACHE_NAME = 'skin-moments-v2';
+const CACHE_NAME = 'skin-moments-v8';
 const ASSETS_TO_CACHE = [
   '../index.html',
   '../styles.css',

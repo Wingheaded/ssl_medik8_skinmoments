@@ -33,7 +33,7 @@ import {
 } from './scheduler.js';
 import { initDrag, makeDraggable, cancelDrag } from './drag.js';
 import { db } from './firebase-config.js';
-import { doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+import { doc, getDoc, setDoc, updateDoc, deleteField, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 
 // ==========================================
 // Date Utilities
@@ -67,6 +67,7 @@ state.date = formatLocalDate(new Date());
 
 let unsubscribeSnapshot = null;
 let flatpickrInstance = null;
+let isSaving = false; // Lock flag to prevent onSnapshot from overwriting during save
 let availabilityCache = {};
 
 // ==========================================
@@ -115,7 +116,10 @@ const elements = {
     uploadPhotoBtn: null,
     removePhotoBtn: null,
     saveExpertBtn: null,
-    cancelExpertBtn: null
+    cancelExpertBtn: null,
+    confirmModal: null,
+    confirmModalCancel: null,
+    confirmModalConfirm: null
 };
 
 // ==========================================
@@ -184,6 +188,58 @@ function cacheElements() {
     elements.removePhotoBtn = document.getElementById('removePhotoBtn');
     elements.saveExpertBtn = document.getElementById('saveExpertBtn');
     elements.cancelExpertBtn = document.getElementById('cancelExpertBtn');
+    elements.confirmModal = document.getElementById('confirmModal');
+    elements.confirmModalCancel = document.getElementById('confirmModalCancel');
+    elements.confirmModalConfirm = document.getElementById('confirmModalConfirm');
+}
+
+// ==========================================
+// Confirmation Modal
+// ==========================================
+
+/**
+ * Shows a custom confirmation modal and returns a Promise
+ * @returns {Promise<boolean>} - true if confirmed, false if cancelled
+ */
+function showConfirmModal() {
+    return new Promise((resolve) => {
+        elements.confirmModal?.classList.remove('hidden');
+
+        function handleConfirm() {
+            cleanup();
+            resolve(true);
+        }
+
+        function handleCancel() {
+            cleanup();
+            resolve(false);
+        }
+
+        function handleBackdrop(e) {
+            if (e.target.classList.contains('confirm-modal__backdrop')) {
+                handleCancel();
+            }
+        }
+
+        function handleEscape(e) {
+            if (e.key === 'Escape') {
+                handleCancel();
+            }
+        }
+
+        function cleanup() {
+            elements.confirmModal?.classList.add('hidden');
+            elements.confirmModalConfirm?.removeEventListener('click', handleConfirm);
+            elements.confirmModalCancel?.removeEventListener('click', handleCancel);
+            elements.confirmModal?.removeEventListener('click', handleBackdrop);
+            document.removeEventListener('keydown', handleEscape);
+        }
+
+        elements.confirmModalConfirm?.addEventListener('click', handleConfirm);
+        elements.confirmModalCancel?.addEventListener('click', handleCancel);
+        elements.confirmModal?.addEventListener('click', handleBackdrop);
+        document.addEventListener('keydown', handleEscape);
+    });
 }
 
 // ==========================================
@@ -222,6 +278,9 @@ async function loadScheduleFromFirebase() {
         }
 
         unsubscribeSnapshot = onSnapshot(doc(db, "schedules", docId), (docSnapshot) => {
+            // Skip if we're currently saving - prevents race condition
+            if (isSaving) return;
+
             if (docSnapshot.exists()) {
                 state.schedule = docSnapshot.data();
                 renderSchedule();
@@ -235,12 +294,16 @@ async function loadScheduleFromFirebase() {
 }
 
 async function saveScheduleToFirebase() {
+    isSaving = true; // Lock to prevent onSnapshot from overwriting
     try {
         const docId = state.date;
         await setDoc(doc(db, "schedules", docId), state.schedule);
         await updateAvailabilityStatus(docId);
     } catch (error) {
         console.error("Error saving schedule:", error);
+    } finally {
+        // Short delay before unlocking to let Firestore sync complete
+        setTimeout(() => { isSaving = false; }, 500);
     }
 }
 
@@ -560,7 +623,9 @@ function createScheduleRow(item, appointments) {
         contentCol.innerHTML = createTechBreakBlock(item.id);
     } else if (item.type === 'bookedAppointment' && item.data) {
         // Booked appointment (time-based block)
-        contentCol.innerHTML = createBookedSlot(item.data, item.start);
+        // Ensure ID is passed!
+        const appointmentData = { ...item.data, id: item.id };
+        contentCol.innerHTML = createBookedSlot(appointmentData, item.start);
     } else {
         // Empty slot - pass blockId for booking
         contentCol.innerHTML = createAvailableSlot(item.start, item.id);
@@ -799,10 +864,13 @@ function handleDeleteTechBreak(breakId) {
     saveScheduleToFirebase();
 }
 
-function handleClearAppointment(appointmentId) {
+async function handleClearAppointment(appointmentId) {
     state.schedule = clearAppointment(state.schedule, appointmentId);
     renderSchedule();
-    saveScheduleToFirebase();
+
+    // Save the full schedule to Firebase - this ensures consistency
+    // and works regardless of document structure
+    await saveScheduleToFirebase();
 }
 
 // ==========================================
@@ -845,7 +913,13 @@ function setupEventListeners() {
         if (clearBtn) {
             e.stopPropagation();
             const appointmentId = clearBtn.dataset.appointmentId;
-            if (appointmentId) handleClearAppointment(appointmentId);
+            if (appointmentId) {
+                showConfirmModal().then(confirmed => {
+                    if (confirmed) {
+                        handleClearAppointment(appointmentId);
+                    }
+                });
+            }
             return;
         }
 
