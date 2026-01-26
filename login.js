@@ -61,8 +61,10 @@ export async function initLogin(callback) {
 
     // Create and show login modal
     createLoginModal();
-    await populatePharmacyDropdown();
     showLoginModal();
+
+    // Load pharmacies in background to avoid blocking the UI
+    populatePharmacyDropdown().catch(err => console.error("Pharmacy list failed:", err));
 
     return false;
 }

@@ -35,7 +35,7 @@ import { initDrag, makeDraggable, cancelDrag } from './drag.js';
 import { db } from './firebase-config.js';
 import { doc, getDoc, setDoc, updateDoc, deleteField, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 import { initLogin } from './login.js';
-import { getSession, isAdmin, getPharmacy, canBookOnDate, getAssignedDatesForMonth } from './auth.js';
+import { getSession, isAdmin, getPharmacy, checkDateAssignment, getAssignedDates } from './auth.js';
 
 // ==========================================
 // Date Utilities
@@ -166,9 +166,10 @@ function onLoginSuccess() {
     loadScheduleFromFirebase();
 
     // Update pharmacy name from session if logged in as pharmacy
-    const pharmacy = getPharmacy();
-    if (pharmacy && elements.pharmacyName) {
-        elements.pharmacyName.textContent = pharmacy.pharmacyName;
+    // Update pharmacy name from session if logged in as pharmacy
+    const session = getSession();
+    if (session && !session.isAdmin && elements.pharmacyName) {
+        elements.pharmacyName.textContent = session.name;
     }
 }
 
@@ -623,7 +624,7 @@ function initFlatpickr() {
 
             // Check if pharmacy user can access this date
             if (!isAdmin()) {
-                const { allowed, reason } = await canBookOnDate(dateStr);
+                const { allowed, reason } = await checkDateAssignment(dateStr);
                 if (!allowed) {
                     // Show error toast and revert
                     alert(t(reason === 'date_not_assigned' ? 'dateNotAssigned' : 'unknownError'));
@@ -661,7 +662,7 @@ async function fetchAssignedDates(monthKey) {
     }
 
     try {
-        const dates = await getAssignedDatesForMonth(monthKey);
+        const dates = await getAssignedDates(monthKey);
         assignedDatesCache[monthKey] = dates;
     } catch (error) {
         console.error('Error fetching assigned dates:', error);

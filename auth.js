@@ -64,7 +64,7 @@ export async function signUpAdmin(name, email, password) {
         await setDoc(doc(db, 'users', user.uid), {
             name,
             email,
-            role: email === 'alexandra@skinselflove.pt' ? 'owner' : 'admin',
+            role: email === 'jose.antonio@skinselflove.com.pt' ? 'owner' : 'admin',
             createdAt: new Date().toISOString()
         });
 
@@ -113,7 +113,7 @@ export async function loginPharmacy(id, pin) {
             return { success: false, error: 'invalid_pin' };
         }
 
-        if (data.status !== 'active') {
+        if (!data.active) {
             return { success: false, error: 'pharmacy_inactive' };
         }
 

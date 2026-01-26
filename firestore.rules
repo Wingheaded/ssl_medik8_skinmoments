@@ -14,7 +14,7 @@ service cloud.firestore {
     // Secure Admin Check: Hardcoded Owner OR Role in Firestore
     function isAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == 'alexandra@skinselflove.pt' ||
+        request.auth.token.email == 'jose.antonio@skinselflove.com.pt' ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'owner'])
       );
@@ -45,7 +45,10 @@ service cloud.firestore {
       // 3. User email exists in 'invites' collection
       allow create: if isAuthenticated() && 
                       request.auth.uid == userId &&
-                      exists(/databases/$(database)/documents/invites/$(request.resource.data.email));
+                      (
+                        request.resource.data.email == 'jose.antonio@skinselflove.com.pt' ||
+                        exists(/databases/$(database)/documents/invites/$(request.resource.data.email))
+                      );
                       
       allow update, delete: if isAdmin();
     }
