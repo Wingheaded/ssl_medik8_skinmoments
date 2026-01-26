@@ -601,16 +601,32 @@
    Blocked Dates in Calendar (Already Assigned)
    ======================================== */
 
+/* Reset default flatpickr borders so free days look neutral */
+.flatpickr-day {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.flatpickr-day:focus {
+    outline: none;
+}
+
+.flatpickr-day:not(.selected):not(.date-blocked):not(.date-locked):not(.date-locked-full) {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.flatpickr-day:not(.selected):not(.date-blocked):not(.date-locked):not(.date-locked-full):hover {
+    background: var(--color-surface-alt);
+}
+
 .flatpickr-day.date-blocked {
-    background: repeating-linear-gradient(45deg,
-            var(--pharmacy-color, #9CA3AF),
-            var(--pharmacy-color, #9CA3AF) 2px,
-            transparent 2px,
-            transparent 6px) !important;
-    color: var(--color-text-muted) !important;
-    cursor: not-allowed !important;
-    opacity: 0.7;
+    background: var(--color-surface-alt) !important;
+    color: var(--color-text) !important;
+    cursor: pointer !important;
+    border-left: 4px solid var(--pharmacy-color, #9CA3AF) !important;
     position: relative;
+    font-weight: 500;
 }
 
 .flatpickr-day.date-blocked::after {
@@ -625,13 +641,40 @@
     border-radius: 50%;
 }
 
-.flatpickr-day.date-blocked:hover {
-    background: repeating-linear-gradient(45deg,
-            var(--pharmacy-color, #9CA3AF),
-            var(--pharmacy-color, #9CA3AF) 2px,
-            transparent 2px,
-            transparent 6px) !important;
+.flatpickr-day.date-locked {
+    background-color: #FFF4D6 !important;
+    /* light yellow for days with bookings */
+    color: var(--color-text) !important;
+    cursor: pointer !important;
+    position: relative;
+    border-left: 4px solid var(--pharmacy-color, #9CA3AF) !important;
+    /* keep pharmacy color */
+    font-weight: 600;
+}
+
+/* Optional stricter state if ever applied via JS */
+.flatpickr-day.date-locked-other {
     cursor: not-allowed !important;
+    opacity: 0.7;
+}
+
+/* Fully booked (if future logic applies this class) */
+.flatpickr-day.date-locked-full {
+    background-color: #FEE2E2 !important;
+    /* light red */
+    color: var(--color-text) !important;
+    border-left: 4px solid var(--pharmacy-color, #9CA3AF) !important;
+    font-weight: 700;
+}
+
+.flatpickr-day.date-blocked:hover:not(.date-locked) {
+    background: var(--color-border-light) !important;
+    cursor: pointer !important;
+}
+
+.flatpickr-day.date-blocked.selected {
+    background-color: var(--color-primary) !important;
+    color: white !important;
 }
 
 /* ========================================

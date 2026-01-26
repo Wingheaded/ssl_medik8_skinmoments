@@ -172,7 +172,10 @@ let pharmaciesById = {};
 let dateAssignments = {};
 let reservations = [];
 let selectedDates = [];
+let lockedDates = new Set();
 let dateAssignmentCalendar = null;
+let bookingsByDate = {}; // { [date]: { total, booked } }
+const MAX_BOOKABLE_SLOTS = 11; // 11 slots per day (with lunch + 2 tech breaks)
 
 // ==========================================
 // Initialization
@@ -196,21 +199,6 @@ document.addEventListener('DOMContentLoaded', async () => {
  */
 function showAdminLogin() {
     window.location.href = './index.html';
-    return;
-    const password = null; // Removed prompt
-    if (!password) {
-        window.location.href = './index.html';
-        return;
-    }
-
-    loginAdmin(password).then(result => {
-        if (result.success) {
-            initializeAdmin();
-        } else {
-            showToast('Senha incorreta', 'error');
-            showAdminLogin();
-        }
-    });
 }
 
 /**
@@ -228,11 +216,17 @@ async function initializeAdmin() {
     await loadReservations();
 
     // Event listeners
-    // Event listeners
     document.getElementById('logoutBtn')?.addEventListener('click', logout);
     document.getElementById('addPharmacyBtn')?.addEventListener('click', () => openPharmacyModal());
     document.getElementById('addFirstPharmacyBtn')?.addEventListener('click', () => openPharmacyModal());
     document.getElementById('assignDatesBtn')?.addEventListener('click', assignDates);
+    document.getElementById('clearSelectedDatesBtn')?.addEventListener('click', clearSelectedDates);
+    document.getElementById('assignPharmacySelect')?.addEventListener('change', () => {
+        filterSelectedDatesForPharmacy();
+        dateAssignmentCalendar?.redraw();
+        updateSelectedDatesList();
+        updateAssignButton();
+    });
 
     // Admin management listeners
     document.getElementById('addAdminBtn')?.addEventListener('click', () => openAdminUserModal());
@@ -261,12 +255,13 @@ function initTheme() {
 }
 
 function setTheme(theme) {
+    const icon = document.getElementById('themeIcon');
     if (theme === 'dark') {
         document.documentElement.classList.add('dark');
-        document.getElementById('themeIcon').textContent = 'light_mode';
+        if (icon) icon.textContent = 'light_mode';
     } else {
         document.documentElement.classList.remove('dark');
-        document.getElementById('themeIcon').textContent = 'dark_mode';
+        if (icon) icon.textContent = 'dark_mode';
     }
 }
 
@@ -320,35 +315,37 @@ function renderPharmaciesTable() {
     const empty = document.getElementById('pharmaciesEmpty');
 
     if (pharmacies.length === 0) {
-        tbody.innerHTML = '';
+        if (tbody) tbody.innerHTML = '';
         empty?.classList.remove('hidden');
         return;
     }
 
     empty?.classList.add('hidden');
 
-    tbody.innerHTML = pharmacies.map(pharmacy => `
-        <tr>
-            <td><strong>${pharmacy.name}</strong></td>
-            <td>${pharmacy.contact || '-'}</td>
-            <td><code>${pharmacy.pin}</code></td>
-            <td>
-                <span class="admin-badge ${pharmacy.active ? 'admin-badge--success' : 'admin-badge--muted'}">
-                    ${pharmacy.active ? 'Ativa' : 'Inativa'}
-                </span>
-            </td>
-            <td>
-                <div class="admin-actions">
-                    <button class="admin-action-btn" onclick="editPharmacy('${pharmacy.id}')" title="Editar">
-                        <span class="material-symbols-outlined">edit</span>
-                    </button>
-                    <button class="admin-action-btn admin-action-btn--danger" onclick="deletePharmacy('${pharmacy.id}')" title="Eliminar">
-                        <span class="material-symbols-outlined">delete</span>
-                    </button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
+    if (tbody) {
+        tbody.innerHTML = pharmacies.map(pharmacy => `
+            <tr>
+                <td><strong>${pharmacy.name}</strong></td>
+                <td>${pharmacy.contact || '-'}</td>
+                <td><code>${pharmacy.pin}</code></td>
+                <td>
+                    <span class="admin-badge ${pharmacy.active ? 'admin-badge--success' : 'admin-badge--muted'}">
+                        ${pharmacy.active ? 'Ativa' : 'Inativa'}
+                    </span>
+                </td>
+                <td>
+                    <div class="admin-actions">
+                        <button class="admin-action-btn" onclick="editPharmacy('${pharmacy.id}')" title="Editar">
+                            <span class="material-symbols-outlined">edit</span>
+                        </button>
+                        <button class="admin-action-btn admin-action-btn--danger" onclick="deletePharmacy('${pharmacy.id}')" title="Eliminar">
+                            <span class="material-symbols-outlined">delete</span>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    }
 }
 
 function populatePharmacyDropdowns() {
@@ -397,7 +394,7 @@ function openPharmacyModal(pharmacyId = null) {
     if (pharmacyId) {
         const pharmacy = pharmacies.find(p => p.id === pharmacyId);
         if (pharmacy) {
-            title.textContent = 'Editar Farmácia';
+            if (title) title.textContent = 'Editar Farmácia';
             document.getElementById('pharmacyId').value = pharmacyId;
             document.getElementById('pharmacyNameInput').value = pharmacy.name;
             document.getElementById('pharmacyContactInput').value = pharmacy.contact || '';
@@ -405,7 +402,7 @@ function openPharmacyModal(pharmacyId = null) {
             document.getElementById('pharmacyActiveInput').checked = pharmacy.active;
         }
     } else {
-        title.textContent = 'Nova Farmácia';
+        if (title) title.textContent = 'Nova Farmácia';
         document.getElementById('pharmacyId').value = '';
         document.getElementById('pharmacyNameInput').value = '';
         document.getElementById('pharmacyContactInput').value = '';
@@ -449,56 +446,36 @@ async function savePharmacy() {
 
         // Update denormalized names in associated collections if editing
         if (pharmacyId) {
-            console.log(`[Admin] Updating pharmacy name for ID: ${pharmacyId} to "${name}"`);
             const updates = [];
+            // Date Assignments
+            const assignmentsRef = collection(db, 'dateAssignments');
+            const q = query(assignmentsRef, where('pharmacyId', '==', docId));
+            const snapshot = await getDocs(q);
+            snapshot.docs.forEach(d => {
+                updates.push(updateDoc(d.ref, { pharmacyName: name }));
+            });
 
-            // 1. Date Assignments
-            try {
-                const assignmentsRef = collection(db, 'dateAssignments');
-                const q = query(assignmentsRef, where('pharmacyId', '==', docId));
-                const snapshot = await getDocs(q);
-                console.log(`[Admin] Found ${snapshot.size} assignments to update in dateAssignments.`);
+            // Schedules
+            const schedulesRef = collection(db, 'schedules');
+            const q2 = query(schedulesRef, where('pharmacyId', '==', docId));
+            const snap2 = await getDocs(q2);
+            snap2.docs.forEach(d => {
+                updates.push(updateDoc(d.ref, { pharmacyName: name }));
+            });
 
-                snapshot.docs.forEach(d => {
-                    updates.push(updateDoc(d.ref, { pharmacyName: name }));
-                });
-            } catch (err) {
-                console.error("[Admin] Error query/update assignments:", err);
-            }
-
-            // 2. Schedules (root pharmacyName)
-            try {
-                const schedulesRef = collection(db, 'schedules');
-                const q2 = query(schedulesRef, where('pharmacyId', '==', docId));
-                const snap2 = await getDocs(q2);
-                console.log(`[Admin] Found ${snap2.size} schedules to update in schedules.`);
-
-                snap2.docs.forEach(d => {
-                    updates.push(updateDoc(d.ref, { pharmacyName: name }));
-                });
-            } catch (err) {
-                console.error("[Admin] Error query/update schedules:", err);
-            }
-
-            if (updates.length > 0) {
-                await Promise.all(updates);
-                console.log(`[Admin] Successfully executed ${updates.length} updates.`);
-            } else {
-                console.log("[Admin] No updates needed.");
-            }
+            if (updates.length > 0) await Promise.all(updates);
         }
 
         closePharmacyModal();
         await loadPharmacies();
-        await loadDateAssignments(); // Refresh calendar tooltips
-        showToast('Farmácia guardada e atribuições atualizadas', 'success');
+        await loadDateAssignments();
+        showToast('Farmácia guardada', 'success');
     } catch (error) {
         console.error('Error saving pharmacy:', error);
         showToast('Erro ao guardar farmácia', 'error');
     }
 }
 
-// Global functions for inline onclick
 window.editPharmacy = openPharmacyModal;
 
 window.deletePharmacy = async function (pharmacyId) {
@@ -536,80 +513,65 @@ function initDateAssignmentCalendar() {
         onDayCreate: (dObj, dStr, fp, dayElem) => {
             const dateStr = formatLocalDate(dayElem.dateObj);
             const assignment = dateAssignments[dateStr];
+            const pharmacyId = document.getElementById('assignPharmacySelect')?.value;
+
+            // Reset any stale classes/attrs from previous renders
+            dayElem.classList.remove('date-blocked', 'date-locked', 'date-locked-full', 'date-locked-other');
+            dayElem.removeAttribute('data-pharmacy');
+            dayElem.removeAttribute('title');
+            dayElem.style.removeProperty('--pharmacy-color');
 
             if (assignment) {
-                // Mark as assigned with pharmacy name tooltip
                 dayElem.classList.add('date-blocked');
-
-                // Use custom tooltip instead of native title
                 dayElem.setAttribute('data-pharmacy', assignment.pharmacyName);
-                dayElem.removeAttribute('title'); // Ensure no native tooltip
+                dayElem.removeAttribute('title');
+
+                const bookingInfo = bookingsByDate[dateStr] || { total: MAX_BOOKABLE_SLOTS, booked: 0 };
+                const tooltipHtml = `Atribuído: <strong>${assignment.pharmacyName}</strong><br/>` +
+                    `Reservas: <strong>${bookingInfo.booked}/${bookingInfo.total || '0'}</strong>`;
 
                 dayElem.addEventListener('mouseenter', (e) => {
-                    const name = dayElem.getAttribute('data-pharmacy');
-                    if (name) showTooltip(e, `Atribuído: <strong>${name}</strong>`);
+                    showTooltip(e, tooltipHtml);
                 });
-                dayElem.addEventListener('mouseleave', () => {
-                    hideTooltip();
-                });
-                dayElem.addEventListener('mousemove', (e) => {
-                    updateTooltipPosition(e);
-                });
+                dayElem.addEventListener('mouseleave', () => hideTooltip());
+                dayElem.addEventListener('mousemove', (e) => updateTooltipPosition(e));
 
-                // Make it visually blocked but keep pharmacy color indicator
                 dayElem.style.setProperty('--pharmacy-color', getPharmacyColor(assignment.pharmacyId));
             }
-        },
-        onChange: (selectedDates, dateStr, instance) => {
-            // Filter out any already-assigned dates from selection
-            const validDates = selectedDates.filter(d => {
-                const ds = formatLocalDate(d);
-                return !dateAssignments[ds];
-            });
 
-            // If user tried to select blocked dates, show warning
-            if (validDates.length < selectedDates.length) {
-                const blockedCount = selectedDates.length - validDates.length;
-                showToast(`${blockedCount} data(s) já atribuída(s) a outra farmácia`, 'warning');
+            // Only show locked styling when the date is assigned AND has bookings
+            if (lockedDates.has(dateStr) && assignment) {
+                const info = bookingsByDate[dateStr] || { total: MAX_BOOKABLE_SLOTS, booked: 0 };
+                const isFullyBooked = info.total > 0 && info.booked >= info.total;
 
-                // Clear and re-select only valid dates
-                instance.clear();
-                if (validDates.length > 0) {
-                    instance.setDate(validDates, true);
+                dayElem.classList.add(isFullyBooked ? 'date-locked-full' : 'date-locked');
+
+                // ONLY prevent interaction if assigned to ANOTHER pharmacy
+                if (assignment.pharmacyId !== pharmacyId) {
+                    dayElem.classList.add('date-locked-other');
+                    dayElem.setAttribute('title', 'Bloqueada por outra farmácia');
+                } else {
+                    dayElem.setAttribute('title', isFullyBooked ? 'Dia totalmente reservado' : 'Esta data tem marcações');
                 }
             }
-
+        },
+        onChange: () => {
+            filterSelectedDatesForPharmacy();
             updateSelectedDatesList();
             updateAssignButton();
         }
     });
 }
 
-/**
- * Generate a consistent color for each pharmacy
- */
 function getPharmacyColor(pharmacyId) {
-    const colors = [
-        '#7B9E89', // Sage green (primary)
-        '#5B8FB9', // Blue
-        '#B97B5B', // Terracotta
-        '#9B7BB9', // Purple
-        '#B9A05B', // Gold
-        '#5BB9A0', // Teal
-        '#B95B8F', // Pink
-    ];
-
-    // Hash pharmacy ID to get consistent color
+    const colors = ['#7B9E89', '#5B8FB9', '#B97B5B', '#9B7BB9', '#B9A05B', '#5BB9A0', '#B95B8F'];
     let hash = 0;
     for (let i = 0; i < pharmacyId.length; i++) {
         hash = ((hash << 5) - hash) + pharmacyId.charCodeAt(i);
         hash = hash & hash;
     }
-
     return colors[Math.abs(hash) % colors.length];
 }
-
-
 
 function formatLocalDate(date) {
     const d = date instanceof Date ? date : new Date(date);
@@ -623,12 +585,14 @@ function updateSelectedDatesList() {
     const list = document.getElementById('selectedDatesList');
     const dates = dateAssignmentCalendar?.selectedDates || [];
 
+    if (!list) return;
+
     if (dates.length === 0) {
         list.innerHTML = '<span class="selected-dates-empty">Clique no calendário para selecionar datas</span>';
         return;
     }
 
-    list.innerHTML = dates.map(d => {
+    list.innerHTML = dates.sort((a, b) => a - b).map(d => {
         const dateStr = formatLocalDate(d);
         return `<span class="selected-date-tag">${dateStr}</span>`;
     }).join('');
@@ -639,7 +603,51 @@ function updateAssignButton() {
     const pharmacySelect = document.getElementById('assignPharmacySelect');
     const dates = dateAssignmentCalendar?.selectedDates || [];
 
-    btn.disabled = dates.length === 0 || !pharmacySelect.value;
+    if (btn) {
+        btn.disabled = dates.length === 0 || !pharmacySelect?.value;
+    }
+}
+
+function clearSelectedDates() {
+    dateAssignmentCalendar?.clear();
+    updateSelectedDatesList();
+    updateAssignButton();
+}
+
+function filterSelectedDatesForPharmacy() {
+    if (!dateAssignmentCalendar) return;
+
+    const pharmacyId = document.getElementById('assignPharmacySelect')?.value;
+    const selected = dateAssignmentCalendar.selectedDates || [];
+
+    if (selected.length === 0) return;
+
+    const allowed = [];
+    let blockedCount = 0;
+
+    selected.forEach(d => {
+        const ds = formatLocalDate(d);
+        const assignment = dateAssignments[ds];
+
+        if (!assignment || assignment.pharmacyId === pharmacyId) {
+            allowed.push(d);
+            return;
+        }
+
+        if (!lockedDates.has(ds)) {
+            allowed.push(d);
+        } else {
+            blockedCount++;
+        }
+    });
+
+    if (blockedCount > 0) {
+        dateAssignmentCalendar.clear();
+        if (allowed.length > 0) {
+            dateAssignmentCalendar.setDate(allowed, true);
+        }
+        showToast(`${blockedCount} data(s) bloqueada(s) por outra farmácia`, 'warning');
+    }
 }
 
 async function loadDateAssignments() {
@@ -662,7 +670,6 @@ async function loadDateAssignments() {
 
 async function reconcileAssignmentNames() {
     const updates = [];
-
     Object.entries(dateAssignments).forEach(([date, data]) => {
         const pharmacy = pharmaciesById[data.pharmacyId];
         if (pharmacy && pharmacy.name && data.pharmacyName !== pharmacy.name) {
@@ -673,11 +680,7 @@ async function reconcileAssignmentNames() {
     });
 
     if (updates.length > 0) {
-        try {
-            await Promise.all(updates);
-        } catch (err) {
-            console.error('Error reconciling assignment names:', err);
-        }
+        try { await Promise.all(updates); } catch (err) { }
     }
 }
 
@@ -685,6 +688,8 @@ function renderAssignedDatesGrid() {
     const grid = document.getElementById('assignedDatesGrid');
     const empty = document.getElementById('assignedDatesEmpty');
     const entries = Object.entries(dateAssignments);
+
+    if (!grid) return;
 
     if (entries.length === 0) {
         grid.innerHTML = '';
@@ -694,14 +699,10 @@ function renderAssignedDatesGrid() {
 
     empty?.classList.add('hidden');
 
-    // Group by pharmacy
     const byPharmacy = {};
     entries.forEach(([date, data]) => {
         if (!byPharmacy[data.pharmacyId]) {
-            byPharmacy[data.pharmacyId] = {
-                name: data.pharmacyName,
-                dates: []
-            };
+            byPharmacy[data.pharmacyId] = { name: data.pharmacyName, dates: [] };
         }
         byPharmacy[data.pharmacyId].dates.push(date);
     });
@@ -741,13 +742,12 @@ async function assignDates() {
             });
         }
 
-        // Clear selection
         dateAssignmentCalendar?.clear();
         document.getElementById('assignPharmacySelect').selectedIndex = 0;
         updateSelectedDatesList();
         updateAssignButton();
 
-        loadDateAssignments();
+        await loadDateAssignments();
         showToast(`${dates.length} data(s) atribuída(s) a ${pharmacy.name}`, 'success');
     } catch (error) {
         console.error('Error assigning dates:', error);
@@ -765,7 +765,7 @@ window.removeAssignment = async function (dateStr) {
 
     try {
         await deleteDoc(doc(db, 'dateAssignments', dateStr));
-        loadDateAssignments();
+        await loadDateAssignments();
         showToast('Atribuição removida', 'success');
     } catch (error) {
         console.error('Error removing assignment:', error);
@@ -777,39 +777,39 @@ window.removeAssignment = async function (dateStr) {
 // Reservations
 // ==========================================
 
-let allReservations = []; // Store all reservations for filtering
-
 async function loadReservations() {
     try {
-        // Load schedules
         const schedulesRef = collection(db, 'schedules');
         const snapshot = await getDocs(schedulesRef);
 
-        allReservations = [];
+        reservations = [];
+        lockedDates.clear();
+        bookingsByDate = {}; // map date -> { total, booked }
+
         snapshot.docs.forEach(docSnap => {
             const dateStr = docSnap.id;
             const data = docSnap.data();
+            let dayHasBookings = false;
+            let bookedCount = 0;
+            let totalCount = MAX_BOOKABLE_SLOTS;
 
-            // Extract appointments from schedule
             if (data.appointments) {
                 Object.entries(data.appointments).forEach(([blockId, apt]) => {
-                    // Safety check for null/undefined appointments (legacy data gaps)
                     if (!apt) return;
+                    if (apt.isBooked) {
+                        dayHasBookings = true;
+                        bookedCount += 1;
+                    }
 
-                    // Get pharmacy info from:
-                    // 1. The appointment itself (new system)
-                    // 2. The schedule's pharmacy (new system)
-                    // 3. The dateAssignments collection (fallback)
                     let pharmacyId = apt.pharmacyId || data.pharmacyId || null;
                     let pharmacyName = apt.pharmacyName || data.pharmacyName || null;
 
-                    // Fallback to dateAssignments
                     if (!pharmacyName && dateAssignments[dateStr]) {
                         pharmacyId = dateAssignments[dateStr].pharmacyId;
                         pharmacyName = dateAssignments[dateStr].pharmacyName;
                     }
 
-                    allReservations.push({
+                    reservations.push({
                         id: `${dateStr}_${blockId}`,
                         date: dateStr,
                         timeSlot: apt.time || blockId,
@@ -821,16 +821,15 @@ async function loadReservations() {
                     });
                 });
             }
+
+            bookingsByDate[dateStr] = { total: totalCount, booked: bookedCount };
+            if (dayHasBookings) lockedDates.add(dateStr);
         });
 
-        // Sort by date descending
-        allReservations.sort((a, b) => b.date.localeCompare(a.date));
-
-        // Apply filters and render
-        filterAndRenderReservations();
-
-        // Setup filter event listeners
+        reservations.sort((a, b) => b.date.localeCompare(a.date));
+        renderReservationsTable();
         setupReservationFilters();
+        dateAssignmentCalendar?.redraw();
     } catch (error) {
         console.error('Error loading reservations:', error);
     }
@@ -851,26 +850,20 @@ function filterAndRenderReservations() {
     const pharmacyFilter = document.getElementById('filterPharmacy')?.value || '';
     const dateFilter = document.getElementById('filterDate')?.value || '';
 
-    let filtered = [...allReservations];
-
-    // Filter by pharmacy
-    if (pharmacyFilter) {
-        filtered = filtered.filter(r => r.pharmacyId === pharmacyFilter);
-    }
-
-    // Filter by date
-    if (dateFilter) {
-        filtered = filtered.filter(r => r.date === dateFilter);
-    }
+    let filtered = [...reservations];
+    if (pharmacyFilter) filtered = filtered.filter(r => r.pharmacyId === pharmacyFilter);
+    if (dateFilter) filtered = filtered.filter(r => r.date === dateFilter);
 
     renderReservationsTable(filtered);
 }
 
-function renderReservationsTable(reservationsToRender = allReservations) {
+function renderReservationsTable(listToRender = reservations) {
     const tbody = document.getElementById('reservationsTableBody');
     const empty = document.getElementById('reservationsEmpty');
 
-    if (reservationsToRender.length === 0) {
+    if (!tbody) return;
+
+    if (listToRender.length === 0) {
         tbody.innerHTML = '';
         empty?.classList.remove('hidden');
         return;
@@ -878,7 +871,7 @@ function renderReservationsTable(reservationsToRender = allReservations) {
 
     empty?.classList.add('hidden');
 
-    tbody.innerHTML = reservationsToRender.map(r => `
+    tbody.innerHTML = listToRender.map(r => `
         <tr>
             <td>${r.date}</td>
             <td>${r.timeSlot}</td>
@@ -887,10 +880,7 @@ function renderReservationsTable(reservationsToRender = allReservations) {
                     ${r.pharmacyName}
                 </span>
             </td>
-            <td>
-                <strong>${r.clientName}</strong><br>
-                <small>${r.clientContact}</small>
-            </td>
+            <td><strong>${r.clientName}</strong><br><small>${r.clientContact}</small></td>
             <td>
                 <span class="admin-badge admin-badge--${getStatusClass(r.status)}">
                     ${getStatusLabel(r.status)}
@@ -908,35 +898,19 @@ function renderReservationsTable(reservationsToRender = allReservations) {
 }
 
 function getStatusClass(status) {
-    const classes = {
-        'scheduled': 'info',
-        'checked-in': 'success',
-        'completed': 'purple',
-        'no-show': 'danger',
-        'cancelled': 'muted'
-    };
+    const classes = { 'scheduled': 'info', 'checked-in': 'success', 'completed': 'purple', 'no-show': 'danger', 'cancelled': 'muted' };
     return classes[status] || 'muted';
 }
 
 function getStatusLabel(status) {
-    const labels = {
-        'scheduled': 'Agendada',
-        'checked-in': 'Check-in',
-        'completed': 'Concluída',
-        'no-show': 'Faltou',
-        'cancelled': 'Cancelada'
-    };
+    const labels = { 'scheduled': 'Agendada', 'checked-in': 'Check-in', 'completed': 'Concluída', 'no-show': 'Faltou', 'cancelled': 'Cancelada' };
     return labels[status] || status;
 }
 
 window.cancelReservation = async function (reservationId) {
     const confirm = await showConfirm(
         'Tem certeza que deseja cancelar esta reserva? Esta ação não pode ser desfeita.',
-        {
-            title: 'Cancelar Reserva',
-            confirmText: 'Sim, Cancelar',
-            confirmStyle: 'danger'
-        }
+        { title: 'Cancelar Reserva', confirmText: 'Sim, Cancelar', confirmStyle: 'danger' }
     );
 
     if (!confirm) return;
@@ -944,67 +918,34 @@ window.cancelReservation = async function (reservationId) {
     showLoading('A cancelar reserva...');
 
     try {
-        // ID format: date_blockId (e.g., 2026-01-30_10:00)
-        let dateStr, blockId;
-
-        // Handle ID formats with underscores
         const parts = reservationId.split('_');
-        if (parts.length >= 2) {
-            // Rejoin date parts if needed (though 2026-01-30 has no underscores inside)
-            // But if blockId has underscore, we handle carefully
-            dateStr = parts[0];
-            blockId = parts.slice(1).join('_');
-        } else {
-            throw new Error('ID de reserva inválido');
-        }
+        if (parts.length < 2) throw new Error('ID inválido');
 
-        // Get the schedule document
+        const dateStr = parts[0];
+        const blockId = parts.slice(1).join('_');
+
         const scheduleRef = doc(db, 'schedules', dateStr);
         const scheduleSnap = await getDoc(scheduleRef);
 
-        if (!scheduleSnap.exists()) {
-            throw new Error('Agendamento não encontrado');
+        if (scheduleSnap.exists()) {
+            const data = scheduleSnap.data();
+            let appointments = data.appointments || {};
+            if (Array.isArray(appointments)) appointments = { ...appointments };
+
+            if (appointments[blockId]) {
+                delete appointments[blockId];
+                await updateDoc(scheduleRef, { appointments });
+                hideLoading();
+                showToast('Reserva cancelada', 'success');
+                await loadReservations();
+            }
         }
-
-        const scheduleData = scheduleSnap.data();
-        let appointments = scheduleData.appointments || {};
-
-        // Convert Array to Object if needed (fixes "Unsupported field value: undefined" error)
-        if (Array.isArray(appointments)) {
-            appointments = { ...appointments };
-        }
-
-        // Remove the appointment by deleting the key
-        if (appointments[blockId]) {
-            delete appointments[blockId];
-
-            // Delete the schedule doc if no appointments left?
-            // Better to keep it but update it.
-            await updateDoc(scheduleRef, {
-                appointments: appointments
-            });
-
-            // Note: Ideally updateAvailabilityStatus should be called here
-            // but it's in app.js. For now we accept availability might lag
-            // or we could duplicate 'updateAvailabilityStatus' logic here.
-
-            hideLoading();
-            showToast('Reserva cancelada com sucesso', 'success');
-
-            // Reload reservations
-            loadReservations();
-        } else {
-            throw new Error('Reserva não encontrada no agendamento');
-        }
-
     } catch (error) {
-        console.error('Error cancelling reservation:', error);
+        console.error(error);
         hideLoading();
-        showToast('Erro ao cancelar reserva', 'error');
+        showToast('Erro ao cancelar', 'error');
     }
 };
-
-// Listen for pharmacy select change
 
 // ==========================================
 // Custom Tooltip
@@ -1024,8 +965,6 @@ function showTooltip(e, text) {
     if (!tooltipEl) initTooltip();
     tooltipEl.innerHTML = text;
     tooltipEl.classList.add('visible');
-
-    // Position immediately
     updateTooltipPosition(e);
 }
 
@@ -1035,17 +974,13 @@ function hideTooltip() {
 
 function updateTooltipPosition(e) {
     if (!tooltipEl || !tooltipEl.classList.contains('visible')) return;
-
     const gap = 15;
     const rect = tooltipEl.getBoundingClientRect();
     let top = e.clientY - rect.height - gap;
     let left = e.clientX - (rect.width / 2);
-
-    // Keep in viewport boundaries
-    if (top < 10) top = e.clientY + gap; // If too close to top, show below
+    if (top < 10) top = e.clientY + gap;
     if (left < 10) left = 10;
     if (left + rect.width > window.innerWidth - 10) left = window.innerWidth - rect.width - 10;
-
     tooltipEl.style.top = `${top}px`;
     tooltipEl.style.left = `${left}px`;
 }
@@ -1054,24 +989,16 @@ function updateTooltipPosition(e) {
 // Admin User Management
 // ==========================================
 
-// ==========================================
-// Admin User Management (RBAC & Invites)
-// ==========================================
-
 let adminUsers = [];
 let pendingInvites = [];
 
 async function loadAdmins() {
     try {
-        await checkAndMigrateLegacyAdmins();
-
-        // Load Active Users
         const usersRef = collection(db, 'users');
         const qUsers = query(usersRef, where('role', 'in', ['admin', 'owner']));
         const snapUsers = await getDocs(qUsers);
         adminUsers = snapUsers.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        // Load Pending Invites
         const invitesRef = collection(db, 'invites');
         const snapInvites = await getDocs(invitesRef);
         pendingInvites = snapInvites.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -1079,45 +1006,6 @@ async function loadAdmins() {
         renderAdminsTable();
     } catch (error) {
         console.error('Error loading admin users:', error);
-    }
-}
-
-async function checkAndMigrateLegacyAdmins() {
-    // Migration: Copy legacy 'admins' to 'invites' so they can sign up
-    // This runs implicitly; efficient enough for small admin lists
-    try {
-        const legacyRef = collection(db, 'admins');
-        const legacySnap = await getDocs(legacyRef);
-
-        if (legacySnap.empty) return;
-
-        const batchPromises = legacySnap.docs.map(async (docSnap) => {
-            const data = docSnap.data();
-            const email = data.email;
-            if (!email) return;
-
-            // Check if invite or user already exists
-            const inviteRef = doc(db, 'invites', email);
-            const userRef = query(collection(db, 'users'), where('email', '==', email));
-            const userSnap = await getDocs(userRef);
-
-            const inviteSnap = await getDoc(inviteRef);
-
-            if (!inviteSnap.exists() && userSnap.empty) {
-                console.log(`[Migration] Creating invite for legacy admin: ${email}`);
-                await setDoc(inviteRef, {
-                    email: email,
-                    name: data.name,
-                    role: 'admin',
-                    invitedBy: 'migration',
-                    createdAt: new Date().toISOString()
-                });
-            }
-        });
-
-        await Promise.all(batchPromises);
-    } catch (e) {
-        console.warn('Migration check failed', e);
     }
 }
 
@@ -1129,56 +1017,27 @@ function renderAdminsTable() {
 
     if (adminUsers.length === 0 && pendingInvites.length === 0) {
         tbody.innerHTML = '';
-        empty.classList.remove('hidden');
+        empty?.classList.remove('hidden');
         return;
     }
 
-    empty.classList.add('hidden');
+    empty?.classList.add('hidden');
 
-    // Render Active Users
     const userRows = adminUsers.map(u => `
         <tr>
-            <td>
-                <div class="admin-table-info">
-                    <span class="admin-table-name">${u.name || 'Sem nome'}</span>
-                </div>
-            </td>
+            <td><span class="admin-table-name">${u.name || 'Sem nome'}</span></td>
             <td>${u.email}</td>
-            <td>
-                <span class="admin-badge ${u.role === 'owner' ? 'admin-badge--purple' : 'admin-badge--success'}">
-                    ${u.role === 'owner' ? 'Owner' : 'Ativo'}
-                </span>
-            </td>
-            <td>
-                <div class="admin-actions">
-                    ${u.role !== 'owner' ? `
-                    <button class="admin-action-btn admin-action-btn--danger" title="Revogar Acesso" onclick="deleteAdminUser('${u.id}', 'user')">
-                        <span class="material-symbols-outlined">person_remove</span>
-                    </button>
-                    ` : ''}
-                </div>
-            </td>
+            <td><span class="admin-badge ${u.role === 'owner' ? 'admin-badge--purple' : 'admin-badge--success'}">${u.role === 'owner' ? 'Owner' : 'Ativo'}</span></td>
+            <td><div class="admin-actions">${u.role !== 'owner' ? `<button class="admin-action-btn admin-action-btn--danger" onclick="deleteAdminUser('${u.id}', 'user')"><span class="material-symbols-outlined">person_remove</span></button>` : ''}</div></td>
         </tr>
     `).join('');
 
-    // Render Pending Invites
     const inviteRows = pendingInvites.map(i => `
         <tr>
-            <td>
-                <div class="admin-table-info">
-                    <span class="admin-table-name">${i.name}</span>
-                    <span style="font-size:10px; color:var(--color-text-muted)">(Convite)</span>
-                </div>
-            </td>
+            <td><span class="admin-table-name">${i.name}</span> <small>(Convite)</small></td>
             <td>${i.email}</td>
             <td><span class="admin-badge admin-badge--info">Pendente</span></td>
-            <td>
-                <div class="admin-actions">
-                    <button class="admin-action-btn admin-action-btn--danger" title="Cancelar Convite" onclick="deleteAdminUser('${i.id}', 'invite')">
-                        <span class="material-symbols-outlined">close</span>
-                    </button>
-                </div>
-            </td>
+            <td><div class="admin-actions"><button class="admin-action-btn admin-action-btn--danger" onclick="deleteAdminUser('${i.id}', 'invite')"><span class="material-symbols-outlined">close</span></button></div></td>
         </tr>
     `).join('');
 
@@ -1187,20 +1046,9 @@ function renderAdminsTable() {
 
 function openAdminUserModal() {
     const modal = document.getElementById('adminUserModal');
-    const title = document.getElementById('adminUserModalTitle');
-
-    // Reset fields
-    document.getElementById('adminUserId').value = ''; // Empty means New Invite
+    document.getElementById('adminUserId').value = '';
     document.getElementById('adminUserNameInput').value = '';
     document.getElementById('adminUserEmailInput').value = '';
-
-    // Password field not needed for invites (removed via DOM or disabled)
-    const pwInput = document.getElementById('adminUserPasswordInput');
-    if (pwInput) {
-        pwInput.parentElement.style.display = 'none'; // Hide password field
-    }
-
-    title.textContent = 'Convidar Administrador';
     modal?.classList.remove('hidden');
 }
 
@@ -1209,72 +1057,33 @@ function closeAdminUserModal() {
 }
 
 async function saveAdminUser() {
-    // This is now "Send Invite"
     const name = document.getElementById('adminUserNameInput').value.trim();
     const email = document.getElementById('adminUserEmailInput').value.trim();
-
-    if (!name || !email) {
-        showToast('Nome e Email são obrigatórios', 'warning');
-        return;
-    }
+    if (!name || !email) return showToast('Preencha os campos', 'warning');
 
     showLoading('A criar convite...');
-
     try {
         const session = getSession();
-        // Create Invite
-        await setDoc(doc(db, 'invites', email), {
-            name,
-            email,
-            role: 'admin',
-            invitedBy: session.uid || 'admin',
-            createdAt: new Date().toISOString()
-        });
-
+        await setDoc(doc(db, 'invites', email), { name, email, role: 'admin', invitedBy: session.uid || 'admin', createdAt: new Date().toISOString() });
         closeAdminUserModal();
         await loadAdmins();
-        showToast('Convite criado. O utilizador já pode criar conta.', 'success');
-    } catch (error) {
-        console.error('Error saving invite:', error);
+        showToast('Convite enviado', 'success');
+    } catch (e) {
         showToast('Erro ao criar convite', 'error');
     } finally {
         hideLoading();
     }
 }
 
-// Bind to window for HTML inline calls
-window.editAdminUser = openAdminUserModal; // Opens blank invite modal (simplified)
-
 window.deleteAdminUser = async function (id, type) {
-    const isUser = type === 'user';
-    const confirm = await showConfirm(
-        isUser ? 'Revogar acesso deste administrador?' : 'Cancelar este convite?',
-        { confirmStyle: 'danger', confirmText: isUser ? 'Revogar' : 'Cancelar' }
-    );
-
+    const confirm = await showConfirm('Remover este acesso?', { confirmStyle: 'danger' });
     if (!confirm) return;
-
     try {
-        if (isUser) {
-            // We verify permissions in rules, but client-side we just delete user doc
-            // And also check for associated invite to clean up?
-            // Actually, deleting 'users' doc is enough.
-            await deleteDoc(doc(db, 'users', id));
-
-            // Also try to find invite by email to keep clean? 
-            // We don't have email handy easily here without lookup.
-            // Ignored for now.
-        } else {
-            // Delete invite (id is the email for invites? No, pendingInvites uses doc.id which is email)
-            await deleteDoc(doc(db, 'invites', id));
-        }
-
+        if (type === 'user') await deleteDoc(doc(db, 'users', id));
+        else await deleteDoc(doc(db, 'invites', id));
         await loadAdmins();
-        showToast(isUser ? 'Acesso revogado' : 'Convite cancelado', 'success');
-    } catch (error) {
-        console.error('Error deleting:', error);
-        showToast('Erro ao eliminar item', 'error');
+        showToast('Removido com sucesso', 'success');
+    } catch (e) {
+        showToast('Erro ao remover', 'error');
     }
 };
-
-// End of file
