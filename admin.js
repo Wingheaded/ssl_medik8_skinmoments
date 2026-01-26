@@ -1054,19 +1054,70 @@ function updateTooltipPosition(e) {
 // Admin User Management
 // ==========================================
 
+// ==========================================
+// Admin User Management (RBAC & Invites)
+// ==========================================
+
+let adminUsers = [];
+let pendingInvites = [];
+
 async function loadAdmins() {
     try {
-        const adminsRef = collection(db, 'admins');
-        const snapshot = await getDocs(adminsRef);
+        await checkAndMigrateLegacyAdmins();
 
-        admins = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
+        // Load Active Users
+        const usersRef = collection(db, 'users');
+        const qUsers = query(usersRef, where('role', 'in', ['admin', 'owner']));
+        const snapUsers = await getDocs(qUsers);
+        adminUsers = snapUsers.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Load Pending Invites
+        const invitesRef = collection(db, 'invites');
+        const snapInvites = await getDocs(invitesRef);
+        pendingInvites = snapInvites.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
         renderAdminsTable();
     } catch (error) {
-        console.error('Error loading admins:', error);
+        console.error('Error loading admin users:', error);
+    }
+}
+
+async function checkAndMigrateLegacyAdmins() {
+    // Migration: Copy legacy 'admins' to 'invites' so they can sign up
+    // This runs implicitly; efficient enough for small admin lists
+    try {
+        const legacyRef = collection(db, 'admins');
+        const legacySnap = await getDocs(legacyRef);
+
+        if (legacySnap.empty) return;
+
+        const batchPromises = legacySnap.docs.map(async (docSnap) => {
+            const data = docSnap.data();
+            const email = data.email;
+            if (!email) return;
+
+            // Check if invite or user already exists
+            const inviteRef = doc(db, 'invites', email);
+            const userRef = query(collection(db, 'users'), where('email', '==', email));
+            const userSnap = await getDocs(userRef);
+
+            const inviteSnap = await getDoc(inviteRef);
+
+            if (!inviteSnap.exists() && userSnap.empty) {
+                console.log(`[Migration] Creating invite for legacy admin: ${email}`);
+                await setDoc(inviteRef, {
+                    email: email,
+                    name: data.name,
+                    role: 'admin',
+                    invitedBy: 'migration',
+                    createdAt: new Date().toISOString()
+                });
+            }
+        });
+
+        await Promise.all(batchPromises);
+    } catch (e) {
+        console.warn('Migration check failed', e);
     }
 }
 
@@ -1076,63 +1127,80 @@ function renderAdminsTable() {
 
     if (!tbody) return;
 
-    if (admins.length === 0) {
+    if (adminUsers.length === 0 && pendingInvites.length === 0) {
         tbody.innerHTML = '';
         empty.classList.remove('hidden');
         return;
     }
 
     empty.classList.add('hidden');
-    tbody.innerHTML = admins.map(admin => `
+
+    // Render Active Users
+    const userRows = adminUsers.map(u => `
         <tr>
             <td>
                 <div class="admin-table-info">
-                    <span class="admin-table-name">${admin.name || 'Sem nome'}</span>
+                    <span class="admin-table-name">${u.name || 'Sem nome'}</span>
                 </div>
             </td>
-            <td>${admin.email || '-'}</td>
-            <td>${admin.loginAt ? new Date(admin.loginAt).toLocaleDateString() : 'Nunca'}</td>
+            <td>${u.email}</td>
+            <td>
+                <span class="admin-badge ${u.role === 'owner' ? 'admin-badge--purple' : 'admin-badge--success'}">
+                    ${u.role === 'owner' ? 'Owner' : 'Ativo'}
+                </span>
+            </td>
             <td>
                 <div class="admin-actions">
-                    <button class="admin-action-btn" title="Editar" onclick="editAdminUser('${admin.id}')">
-                        <span class="material-symbols-outlined">edit</span>
-                    </button>
-                    <!-- Prevent deleting yourself or the master admin fallback (by email) -->
-                    ${admin.email !== 'alexandra@skinselflove.pt' ? `
-                    <button class="admin-action-btn admin-action-btn--danger" title="Eliminar" onclick="deleteAdminUser('${admin.id}')">
-                        <span class="material-symbols-outlined">delete</span>
+                    ${u.role !== 'owner' ? `
+                    <button class="admin-action-btn admin-action-btn--danger" title="Revogar Acesso" onclick="deleteAdminUser('${u.id}', 'user')">
+                        <span class="material-symbols-outlined">person_remove</span>
                     </button>
                     ` : ''}
                 </div>
             </td>
         </tr>
     `).join('');
+
+    // Render Pending Invites
+    const inviteRows = pendingInvites.map(i => `
+        <tr>
+            <td>
+                <div class="admin-table-info">
+                    <span class="admin-table-name">${i.name}</span>
+                    <span style="font-size:10px; color:var(--color-text-muted)">(Convite)</span>
+                </div>
+            </td>
+            <td>${i.email}</td>
+            <td><span class="admin-badge admin-badge--info">Pendente</span></td>
+            <td>
+                <div class="admin-actions">
+                    <button class="admin-action-btn admin-action-btn--danger" title="Cancelar Convite" onclick="deleteAdminUser('${i.id}', 'invite')">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+
+    tbody.innerHTML = userRows + inviteRows;
 }
 
-function openAdminUserModal(adminId = null) {
+function openAdminUserModal() {
     const modal = document.getElementById('adminUserModal');
     const title = document.getElementById('adminUserModalTitle');
 
     // Reset fields
-    document.getElementById('adminUserId').value = '';
+    document.getElementById('adminUserId').value = ''; // Empty means New Invite
     document.getElementById('adminUserNameInput').value = '';
     document.getElementById('adminUserEmailInput').value = '';
-    document.getElementById('adminUserPasswordInput').value = '';
 
-    if (adminId) {
-        const admin = admins.find(a => a.id === adminId);
-        if (admin) {
-            title.textContent = 'Editar Administrador';
-            document.getElementById('adminUserId').value = adminId;
-            document.getElementById('adminUserNameInput').value = admin.name;
-            document.getElementById('adminUserEmailInput').value = admin.email;
-            document.getElementById('adminUserPasswordInput').placeholder = 'Deixe em branco para manter';
-        }
-    } else {
-        title.textContent = 'Novo Administrador';
-        document.getElementById('adminUserPasswordInput').placeholder = 'Senha forte';
+    // Password field not needed for invites (removed via DOM or disabled)
+    const pwInput = document.getElementById('adminUserPasswordInput');
+    if (pwInput) {
+        pwInput.parentElement.style.display = 'none'; // Hide password field
     }
 
+    title.textContent = 'Convidar Administrador';
     modal?.classList.remove('hidden');
 }
 
@@ -1141,78 +1209,71 @@ function closeAdminUserModal() {
 }
 
 async function saveAdminUser() {
-    const adminId = document.getElementById('adminUserId').value;
+    // This is now "Send Invite"
     const name = document.getElementById('adminUserNameInput').value.trim();
     const email = document.getElementById('adminUserEmailInput').value.trim();
-    const password = document.getElementById('adminUserPasswordInput').value.trim();
 
     if (!name || !email) {
         showToast('Nome e Email são obrigatórios', 'warning');
         return;
     }
 
-    // Password validation
-    if (!adminId && !password) {
-        showToast('Senha é obrigatória para novos administradores', 'warning');
-        return;
-    }
-
-    if (password && password.length < 6) {
-        showToast('A senha deve ter pelo menos 6 caracteres', 'warning');
-        return;
-    }
-
-    showLoading('A guardar administrador...');
+    showLoading('A criar convite...');
 
     try {
-        const docId = adminId || `admin_${Date.now()}`;
-        const data = {
+        const session = getSession();
+        // Create Invite
+        await setDoc(doc(db, 'invites', email), {
             name,
             email,
-            active: true,
-            updatedAt: new Date().toISOString()
-        };
-
-        if (password) {
-            data.password = password; // In production, hash this!
-        }
-
-        // If creating new, add createdAt
-        if (!adminId) {
-            data.createdAt = new Date().toISOString();
-        }
-
-        await setDoc(doc(db, 'admins', docId), data, { merge: true });
+            role: 'admin',
+            invitedBy: session.uid || 'admin',
+            createdAt: new Date().toISOString()
+        });
 
         closeAdminUserModal();
         await loadAdmins();
-        showToast('Administrador guardado com sucesso', 'success');
+        showToast('Convite criado. O utilizador já pode criar conta.', 'success');
     } catch (error) {
-        console.error('Error saving admin:', error);
-        showToast('Erro ao guardar administrador', 'error');
+        console.error('Error saving invite:', error);
+        showToast('Erro ao criar convite', 'error');
     } finally {
         hideLoading();
     }
 }
 
 // Bind to window for HTML inline calls
-window.editAdminUser = openAdminUserModal;
+window.editAdminUser = openAdminUserModal; // Opens blank invite modal (simplified)
 
-window.deleteAdminUser = async function (adminId) {
+window.deleteAdminUser = async function (id, type) {
+    const isUser = type === 'user';
     const confirm = await showConfirm(
-        'Tem a certeza que deseja eliminar este administrador?',
-        { confirmStyle: 'danger', confirmText: 'Eliminar' }
+        isUser ? 'Revogar acesso deste administrador?' : 'Cancelar este convite?',
+        { confirmStyle: 'danger', confirmText: isUser ? 'Revogar' : 'Cancelar' }
     );
 
     if (!confirm) return;
 
     try {
-        await deleteDoc(doc(db, 'admins', adminId));
+        if (isUser) {
+            // We verify permissions in rules, but client-side we just delete user doc
+            // And also check for associated invite to clean up?
+            // Actually, deleting 'users' doc is enough.
+            await deleteDoc(doc(db, 'users', id));
+
+            // Also try to find invite by email to keep clean? 
+            // We don't have email handy easily here without lookup.
+            // Ignored for now.
+        } else {
+            // Delete invite (id is the email for invites? No, pendingInvites uses doc.id which is email)
+            await deleteDoc(doc(db, 'invites', id));
+        }
+
         await loadAdmins();
-        showToast('Administrador eliminado', 'success');
+        showToast(isUser ? 'Acesso revogado' : 'Convite cancelado', 'success');
     } catch (error) {
-        console.error('Error deleting admin:', error);
-        showToast('Erro ao eliminar administrador', 'error');
+        console.error('Error deleting:', error);
+        showToast('Erro ao eliminar item', 'error');
     }
 };
 

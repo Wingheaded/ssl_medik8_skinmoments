@@ -8,12 +8,11 @@ import {
     getSession,
     loginPharmacy,
     loginAdmin,
+    signUpAdmin,
     logout,
     getPharmacyList,
     isAdmin as checkIsAdmin,
-    getPharmacy,
-    checkAnyAdmins,
-    registerFirstAdmin
+    initAuth
 } from './auth.js';
 
 // ==========================================
@@ -27,7 +26,6 @@ let adminEmailInput = null;
 let adminPasswordInput = null;
 let loginError = null;
 let loginBtn = null;
-let adminToggle = null;
 let pharmacyFields = null;
 let adminFields = null;
 
@@ -42,13 +40,17 @@ let onLoginSuccess = null;
 // Initialization
 // ==========================================
 
-/**
- * Initialize login modal and check existing session
- * @param {Function} callback - Called after successful login
- * @returns {boolean} - True if already logged in
- */
 export async function initLogin(callback) {
     onLoginSuccess = callback;
+
+    // Initialize Auth Listener
+    initAuth((user) => {
+        if (user && onLoginSuccess) {
+            // If firebase user detected, ensure UI is updated
+            // We can reload or just trigger callback depending on app flow
+            // App.js typically checks getSession on load.
+        }
+    });
 
     // Check existing session
     const session = getSession();
@@ -61,16 +63,11 @@ export async function initLogin(callback) {
     createLoginModal();
     await populatePharmacyDropdown();
     showLoginModal();
-    initSetupCheck();
 
     return false;
 }
 
-/**
- * Create login modal DOM
- */
 function createLoginModal() {
-    // Check if already exists
     if (document.getElementById('loginModal')) {
         cacheLoginElements();
         return;
@@ -134,9 +131,9 @@ function createLoginModal() {
                 <!-- Submit Button -->
                 <button class="login-modal__submit-btn" id="loginBtn" data-i18n="login">Entrar</button>
 
-                <!-- Setup First Admin Link -->
+                <!-- Setup/Signup Link (Only visible in Admin Mode) -->
                 <button class="login-modal__link hidden" id="setupAdminLink" style="margin-top: 1rem; width: 100%; text-decoration: underline; background: none; border: none; cursor: pointer; color: var(--primary-color);">
-                    Configurar Primeiro Acesso
+                    Criar Conta / Aceitar Convite
                 </button>
             </div>
             
@@ -152,9 +149,6 @@ function createLoginModal() {
     translatePage();
 }
 
-/**
- * Cache login modal elements
- */
 function cacheLoginElements() {
     loginModal = document.getElementById('loginModal');
     pharmacySelect = document.getElementById('pharmacySelect');
@@ -167,23 +161,19 @@ function cacheLoginElements() {
     adminFields = document.getElementById('adminFields');
 }
 
-/**
- * Attach event listeners to login modal
- */
 function attachLoginListeners() {
-    // Mode toggle
     document.getElementById('pharmacyModeBtn')?.addEventListener('click', () => toggleMode(false));
     document.getElementById('adminModeBtn')?.addEventListener('click', () => toggleMode(true));
-
-    // Login button
     loginBtn?.addEventListener('click', handleLogin);
 
-    // Enter key on inputs
+    // Setup Link
+    const setupLink = document.getElementById('setupAdminLink');
+    if (setupLink) setupLink.addEventListener('click', renderSetupForm);
+
     pinInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
     adminEmailInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter') adminPasswordInput?.focus(); });
     adminPasswordInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
 
-    // PIN input: auto-advance when 4 digits entered
     pinInput?.addEventListener('input', (e) => {
         e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
         if (e.target.value.length === 4) {
@@ -192,42 +182,32 @@ function attachLoginListeners() {
     });
 }
 
-/**
- * Toggle between pharmacy and admin mode
- */
 function toggleMode(admin) {
     isAdminMode = admin;
-
     document.getElementById('pharmacyModeBtn')?.classList.toggle('active', !admin);
     document.getElementById('adminModeBtn')?.classList.toggle('active', admin);
-
     pharmacyFields?.classList.toggle('hidden', admin);
     adminFields?.classList.toggle('hidden', !admin);
+
+    // Show Signup link only in Admin mode
+    const setupLink = document.getElementById('setupAdminLink');
+    if (setupLink) setupLink.classList.toggle('hidden', !admin);
 
     hideError();
 }
 
-/**
- * Populate pharmacy dropdown from Firestore
- */
 async function populatePharmacyDropdown() {
     if (!pharmacySelect) return;
-
     const pharmacies = await getPharmacyList();
-
-    // Clear existing options except the placeholder
     while (pharmacySelect.options.length > 1) {
         pharmacySelect.remove(1);
     }
-
     pharmacies.forEach(pharmacy => {
         const option = document.createElement('option');
         option.value = pharmacy.id;
         option.textContent = pharmacy.name;
         pharmacySelect.appendChild(option);
     });
-
-    // If no pharmacies, show message
     if (pharmacies.length === 0) {
         const option = document.createElement('option');
         option.value = '';
@@ -237,9 +217,6 @@ async function populatePharmacyDropdown() {
     }
 }
 
-/**
- * Handle login button click
- */
 async function handleLogin() {
     hideError();
     loginBtn.disabled = true;
@@ -249,11 +226,11 @@ async function handleLogin() {
         let result;
 
         if (isAdminMode) {
-            const email = adminEmailInput?.value?.trim() || 'admin'; // Fallback for legacy calls if hidden/empty
+            const email = adminEmailInput?.value?.trim();
             const password = adminPasswordInput?.value;
 
-            if (!password) {
-                showError(t('enterPassword') || 'Introduza a senha');
+            if (!email || !password) {
+                showError(t('enterPassword') || 'Introduza email e senha');
                 return;
             }
             result = await loginAdmin(email, password);
@@ -277,6 +254,7 @@ async function handleLogin() {
             hideLoginModal();
             updateLoginUI();
             onLoginSuccess?.();
+            window.location.reload(); // Ensure session is clean
         } else {
             showError(getErrorMessage(result.error));
         }
@@ -286,25 +264,20 @@ async function handleLogin() {
     }
 }
 
-/**
- * Get localized error message
- */
 function getErrorMessage(errorCode) {
     const messages = {
         'pharmacy_not_found': t('pharmacyNotFound') || 'Farmácia não encontrada',
         'pharmacy_inactive': t('pharmacyInactive') || 'Farmácia inativa',
         'invalid_pin': t('invalidPin') || 'PIN incorreto',
         'invalid_password': t('invalidPassword') || 'Senha incorreta',
-        'admin_not_configured': t('adminNotConfigured') || 'Admin não configurado',
-        'user_not_found': t('userNotFound') || 'Utilizador não encontrado',
+        'auth/invalid-credential': 'Credenciais inválidas',
+        'auth/user-not-found': 'Utilizador não encontrado',
+        'auth/wrong-password': 'Senha incorreta',
         'network_error': t('networkError') || 'Erro de rede'
     };
-    return messages[errorCode] || t('unknownError') || 'Erro desconhecido';
+    return messages[errorCode] || errorCode || t('unknownError') || 'Erro desconhecido';
 }
 
-/**
- * Show error message
- */
 function showError(message) {
     if (loginError) {
         loginError.classList.remove('hidden');
@@ -313,82 +286,52 @@ function showError(message) {
     }
 }
 
-/**
- * Hide error message
- */
 function hideError() {
     loginError?.classList.add('hidden');
 }
 
-/**
- * Show login modal
- */
 function showLoginModal() {
     loginModal?.classList.add('visible');
-    // Clear inputs
-    if (pharmacySelect) pharmacySelect.selectedIndex = 0;
-    if (pinInput) pinInput.value = '';
-    if (adminEmailInput) adminEmailInput.value = '';
-    if (adminPasswordInput) adminPasswordInput.value = '';
-    hideError();
+    // Default to pharmacy mode
+    toggleMode(false);
 }
 
-/**
- * Hide login modal
- */
 function hideLoginModal() {
     loginModal?.classList.remove('visible');
 }
 
-/**
- * Update UI after login (show logged-in state in header)
- */
 function updateLoginUI() {
     const isAdmin = checkIsAdmin();
-    const pharmacy = getPharmacy();
+    const session = getSession();
 
-    // Update pharmacy name in header if pharmacy user
-    if (!isAdmin && pharmacy) {
+    if (!isAdmin && session && session.name) {
         const pharmacyNameEl = document.getElementById('pharmacyName');
         if (pharmacyNameEl) {
-            pharmacyNameEl.textContent = pharmacy.pharmacyName;
+            pharmacyNameEl.textContent = session.name;
         }
     }
 
-    // Add logged-in class to body
     document.body.classList.add('logged-in');
     if (isAdmin) {
         document.body.classList.add('is-admin');
     }
 
-    // Create logout button in header if not exists
     createLogoutButton();
 }
 
-/**
- * Create logout button in header
- */
 function createLogoutButton() {
     if (document.getElementById('logoutBtn')) return;
-
     const headerActions = document.querySelector('.header__actions');
     if (!headerActions) return;
-
     const logoutBtn = document.createElement('button');
     logoutBtn.id = 'logoutBtn';
     logoutBtn.className = 'header__icon-btn';
-    logoutBtn.setAttribute('aria-label', t('logout') || 'Sair');
     logoutBtn.innerHTML = '<span class="material-symbols-outlined">logout</span>';
     logoutBtn.addEventListener('click', logout);
-
-    // Insert before the avatar
     const avatar = headerActions.querySelector('.header__avatar');
     headerActions.insertBefore(logoutBtn, avatar);
 }
 
-/**
- * Show login modal (for re-login after logout)
- */
 export function showLogin() {
     createLoginModal();
     populatePharmacyDropdown();
@@ -396,25 +339,18 @@ export function showLogin() {
 }
 
 // ==========================================
-// Setup Flow (First Admin)
+// Setup/Signup Flow
 // ==========================================
-
-async function initSetupCheck() {
-    const hasAdmins = await checkAnyAdmins();
-    const setupLink = document.getElementById('setupAdminLink');
-    if (!hasAdmins && setupLink) {
-        setupLink.classList.remove('hidden');
-        setupLink.onclick = renderSetupForm;
-    }
-}
 
 function renderSetupForm() {
     const modalBody = document.querySelector('.login-modal__body');
     if (!modalBody) return;
 
     modalBody.innerHTML = `
-        <h3 style="text-align: center; margin-bottom: 1.5rem; color: var(--primary-color);">Configuração Inicial</h3>
-        <p style="text-align: center; margin-bottom: 1rem; font-size: 0.9rem; color: #666;">Crie a primeira conta de administrador para aceder ao sistema.</p>
+        <h3 style="text-align: center; margin-bottom: 1.5rem; color: var(--primary-color);">Criar Conta</h3>
+        <p style="text-align: center; margin-bottom: 1rem; font-size: 0.9rem; color: #666;">
+            Apenas para emails convidados pelo administrador.
+        </p>
         
         <div class="login-modal__fields">
             <div class="login-modal__field">
@@ -426,7 +362,7 @@ function renderSetupForm() {
                 <input type="email" class="login-modal__input" id="setupEmail" placeholder="seu.email@exemplo.com">
             </div>
             <div class="login-modal__field">
-                <label class="login-modal__label">Senha</label>
+                <label class="login-modal__label">Nova Senha</label>
                 <input type="password" class="login-modal__input" id="setupPassword" placeholder="Senha forte">
             </div>
         </div>
@@ -439,7 +375,7 @@ function renderSetupForm() {
 
     document.getElementById('setupSubmitBtn').onclick = handleSetupSubmit;
     document.getElementById('setupBackBtn').onclick = () => {
-        window.location.reload(); // Simple reload to restore login form
+        window.location.reload();
     };
 }
 
@@ -461,17 +397,21 @@ async function handleSetupSubmit() {
     btn.disabled = true;
     btn.textContent = 'A criar conta...';
 
-    const result = await registerFirstAdmin(name, email, password);
+    const result = await signUpAdmin(name, email, password);
 
     if (result.success) {
-        window.location.reload(); // Reload to pick up session
+        // Auto login handled by initAuth listener usually, but reload ensures state
+        window.location.reload();
     } else {
         btn.disabled = false;
         btn.textContent = 'Criar Conta';
         if (errorEl) {
-            errorEl.textContent = 'Erro ao criar conta: ' + (result.error || 'Erro desconhecido');
+            let msg = 'Erro ao criar conta.';
+            if (result.error === 'permission-denied') msg = 'Email não convidado ou já registado.';
+            if (result.error === 'auth/email-already-in-use') msg = 'Email já está em uso.';
+            if (result.error === 'auth/weak-password') msg = 'A senha deve ter 6+ caracteres.';
+            errorEl.textContent = msg + ` (${result.error})`;
             errorEl.classList.remove('hidden');
         }
     }
 }
-
