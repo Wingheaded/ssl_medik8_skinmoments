@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Medik8 Skin Moments - Painel de Administração">
+    <meta name="theme-color" content="#7B9E89">
+
+    <title>Admin - Skin Moments Scheduler</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Manrope:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet">
+
+    <!-- Flatpickr -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./admin-styles.css">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="./assets/medik8-logo.svg">
+</head>
+
+<body class="admin-page">
+    <!-- Header -->
+    <header class="header" role="banner">
+        <div class="header__container">
+            <!-- Brand -->
+            <div class="header__brand">
+                <div class="header__logo">Medik8</div>
+                <div class="header__divider"></div>
+                <div class="header__admin-badge">
+                    <span class="material-symbols-outlined">admin_panel_settings</span>
+                    <span>Admin</span>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="header__actions">
+                <!-- Theme Toggle -->
+                <button class="header__icon-btn" id="themeToggle" aria-label="Toggle theme">
+                    <span class="material-symbols-outlined" id="themeIcon">dark_mode</span>
+                </button>
+
+                <!-- Logout -->
+                <button class="header__icon-btn" id="logoutBtn" aria-label="Sair">
+                    <span class="material-symbols-outlined">logout</span>
+                </button>
+
+                <!-- User Avatar -->
+                <div class="header__avatar">
+                    <img src="./assets/SKIN SELF LOVE_LOGO_HORIZONTAL_MANCHA_RGB.png" alt="Skin Self Love">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+        <!-- Sidebar Navigation -->
+        <aside class="admin-sidebar">
+            <nav class="admin-nav">
+                <button class="admin-nav__item active" data-section="pharmacies">
+                    <span class="material-symbols-outlined">local_pharmacy</span>
+                    <span>Farmácias</span>
+                </button>
+                <button class="admin-nav__item" data-section="dates">
+                    <span class="material-symbols-outlined">calendar_month</span>
+                    <span>Atribuir Datas</span>
+                </button>
+                <button class="admin-nav__item" data-section="reservations">
+                    <span class="material-symbols-outlined">event_available</span>
+                    <span>Reservas</span>
+                </button>
+                <div class="admin-nav-divider"></div>
+                <button class="admin-nav__item" data-section="admins">
+                    <span class="material-symbols-outlined">manage_accounts</span>
+                    <span>Administradores</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Content Area -->
+        <div class="admin-content">
+            <!-- Pharmacies Section -->
+            <section class="admin-section active" id="pharmaciesSection">
+                <div class="admin-section__header">
+                    <h2>Gestão de Farmácias</h2>
+                    <button class="admin-btn admin-btn--primary" id="addPharmacyBtn">
+                        <span class="material-symbols-outlined">add</span>
+                        Nova Farmácia
+                    </button>
+                </div>
+
+                <div class="admin-card">
+                    <table class="admin-table" id="pharmaciesTable">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Contacto</th>
+                                <th>PIN</th>
+                                <th>Estado</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pharmaciesTableBody">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                    <div class="admin-empty" id="pharmaciesEmpty">
+                        <span class="material-symbols-outlined">local_pharmacy</span>
+                        <p>Nenhuma farmácia registada</p>
+                        <button class="admin-btn admin-btn--outline" id="addFirstPharmacyBtn">Adicionar
+                            Farmácia</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Date Assignment Section -->
+            <section class="admin-section" id="datesSection">
+                <div class="admin-section__header">
+                    <h2>Atribuir Datas a Farmácias</h2>
+                </div>
+
+                <div class="admin-dates-layout">
+                    <div class="admin-card admin-dates-calendar">
+                        <h3>Selecione as Datas</h3>
+                        <div id="dateAssignmentCalendar"></div>
+                    </div>
+
+                    <div class="admin-card admin-dates-form">
+                        <h3>Atribuir a Farmácia</h3>
+                        <div class="admin-form-group">
+                            <label>Datas Selecionadas</label>
+                            <div class="selected-dates-list" id="selectedDatesList">
+                                <span class="selected-dates-empty">Clique no calendário para selecionar datas</span>
+                            </div>
+                        </div>
+                        <div class="admin-form-group">
+                            <label>Farmácia</label>
+                            <select class="admin-select" id="assignPharmacySelect">
+                                <option value="" disabled selected>Escolha uma farmácia...</option>
+                            </select>
+                        </div>
+                        <button class="admin-btn admin-btn--primary admin-btn--full" id="assignDatesBtn" disabled>
+                            <span class="material-symbols-outlined">check</span>
+                            Atribuir Datas
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Assigned Dates Overview -->
+                <div class="admin-card">
+                    <h3>Datas Atribuídas</h3>
+                    <div class="assigned-dates-grid" id="assignedDatesGrid">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                    <div class="admin-empty" id="assignedDatesEmpty">
+                        <span class="material-symbols-outlined">event_busy</span>
+                        <p>Nenhuma data atribuída</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Reservations Section -->
+            <section class="admin-section" id="reservationsSection">
+                <div class="admin-section__header">
+                    <h2>Todas as Reservas</h2>
+                    <div class="admin-filters">
+                        <select class="admin-select" id="filterPharmacy">
+                            <option value="">Todas as Farmácias</option>
+                        </select>
+                        <input type="date" class="admin-input" id="filterDate">
+                    </div>
+                </div>
+
+                <div class="admin-card">
+                    <table class="admin-table" id="reservationsTable">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Horário</th>
+                                <th>Farmácia</th>
+                                <th>Cliente</th>
+                                <th>Estado</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reservationsTableBody">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                    <div class="admin-empty" id="reservationsEmpty">
+                        <span class="material-symbols-outlined">event_available</span>
+                        <p>Nenhuma reserva encontrada</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Admins Section -->
+            <section class="admin-section" id="adminsSection">
+                <div class="admin-section__header">
+                    <h2>Gestão de Administradores</h2>
+                    <button class="admin-btn admin-btn--primary" id="addAdminBtn">
+                        <span class="material-symbols-outlined">add</span>
+                        Novo Administrador
+                    </button>
+                </div>
+
+                <div class="admin-card">
+                    <table class="admin-table" id="adminsTable">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Email</th>
+                                <th>Último Acesso</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminsTableBody">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                    <div class="admin-empty" id="adminsEmpty">
+                        <span class="material-symbols-outlined">manage_accounts</span>
+                        <p>Nenhum administrador encontrado</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Add/Edit Pharmacy Modal -->
+    <div class="admin-modal hidden" id="pharmacyModal">
+        <div class="admin-modal__backdrop"></div>
+        <div class="admin-modal__content">
+            <div class="admin-modal__header">
+                <h3 id="pharmacyModalTitle">Nova Farmácia</h3>
+                <button class="admin-modal__close" id="closePharmacyModal">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="admin-modal__body">
+                <input type="hidden" id="pharmacyId">
+                <div class="admin-form-group">
+                    <label>Nome da Farmácia</label>
+                    <input type="text" class="admin-input" id="pharmacyNameInput" placeholder="Ex: Farmácia Central">
+                </div>
+                <div class="admin-form-group">
+                    <label>Contacto</label>
+                    <input type="text" class="admin-input" id="pharmacyContactInput" placeholder="Email ou telefone">
+                </div>
+                <div class="admin-form-group">
+                    <label>PIN (4 dígitos)</label>
+                    <input type="text" class="admin-input" id="pharmacyPinInput" maxlength="4" pattern="[0-9]{4}"
+                        placeholder="••••">
+                </div>
+                <div class="admin-form-group">
+                    <label>
+                        <input type="checkbox" id="pharmacyActiveInput" checked>
+                        Farmácia Ativa
+                    </label>
+                </div>
+            </div>
+            <div class="admin-modal__footer">
+                <button class="admin-btn admin-btn--outline" id="cancelPharmacyModal">Cancelar</button>
+                <button class="admin-btn admin-btn--primary" id="savePharmacyBtn">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Admin User Modal -->
+    <div class="admin-modal hidden" id="adminUserModal">
+        <div class="admin-modal__backdrop"></div>
+        <div class="admin-modal__content">
+            <div class="admin-modal__header">
+                <h3 id="adminUserModalTitle">Novo Administrador</h3>
+                <button class="admin-modal__close" id="closeAdminUserModal">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="admin-modal__body">
+                <input type="hidden" id="adminUserId">
+                <div class="admin-form-group">
+                    <label>Nome</label>
+                    <input type="text" class="admin-input" id="adminUserNameInput" placeholder="Ex: Maria Santos">
+                </div>
+                <div class="admin-form-group">
+                    <label>Email</label>
+                    <input type="email" class="admin-input" id="adminUserEmailInput" placeholder="admin@medik8.pt">
+                </div>
+                <div class="admin-form-group">
+                    <label>Senha</label>
+                    <div class="password-input-wrapper">
+                        <input type="text" class="admin-input" id="adminUserPasswordInput" placeholder="Senha forte">
+                        <small class="form-hint">Mínimo 6 caracteres</small>
+                    </div>
+                </div>
+            </div>
+            <div class="admin-modal__footer">
+                <button class="admin-btn admin-btn--outline" id="cancelAdminUserModal">Cancelar</button>
+                <button class="admin-btn admin-btn--primary" id="saveAdminUserBtn">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+    <!-- Admin Script -->
+    <script type="module" src="./admin.js"></script>
+</body>
+
+</html>

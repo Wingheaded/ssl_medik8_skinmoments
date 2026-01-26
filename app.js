@@ -34,6 +34,8 @@ import {
 import { initDrag, makeDraggable, cancelDrag } from './drag.js';
 import { db } from './firebase-config.js';
 import { doc, getDoc, setDoc, updateDoc, deleteField, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+import { initLogin } from './login.js';
+import { getSession, isAdmin, getPharmacy, canBookOnDate, getAssignedDatesForMonth } from './auth.js';
 
 // ==========================================
 // Date Utilities
@@ -63,12 +65,11 @@ const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1580489944761-15a19d65
 let state = createInitialState();
 state.date = formatLocalDate(new Date());
 
-state.date = formatLocalDate(new Date());
-
 let unsubscribeSnapshot = null;
 let flatpickrInstance = null;
 let isSaving = false; // Lock flag to prevent onSnapshot from overwriting during save
 let availabilityCache = {};
+let assignedDatesCache = {}; // Cache for assigned dates per month
 
 // ==========================================
 // DOM Elements
@@ -132,6 +133,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     translatePage();
     updateLanguageToggle();
     initTheme();
+
+    // Initialize login - callback runs after successful authentication
+    const isLoggedIn = await initLogin(onLoginSuccess);
+
+    if (isLoggedIn) {
+        // Already logged in, initialize app
+        onLoginSuccess();
+    }
+});
+
+/**
+ * Called after successful login - initializes the main app
+ */
+function onLoginSuccess() {
+    // Redirect to Admin Panel if admin
+    if (isAdmin()) {
+        window.location.href = './admin.html';
+        return;
+    }
+
     initEditableFields();
     updateDateDisplay();
 
@@ -143,7 +164,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
     renderSchedule();
     loadScheduleFromFirebase();
-});
+
+    // Update pharmacy name from session if logged in as pharmacy
+    const pharmacy = getPharmacy();
+    if (pharmacy && elements.pharmacyName) {
+        elements.pharmacyName.textContent = pharmacy.pharmacyName;
+    }
+}
 
 function cacheElements() {
     elements.scheduleBody = document.getElementById('scheduleBody');
@@ -297,7 +324,34 @@ async function saveScheduleToFirebase() {
     isSaving = true; // Lock to prevent onSnapshot from overwriting
     try {
         const docId = state.date;
-        await setDoc(doc(db, "schedules", docId), state.schedule);
+
+        // Get current pharmacy info from session
+        const pharmacy = getPharmacy();
+        const pharmacyId = pharmacy?.pharmacyId || null;
+        const pharmacyName = pharmacy?.pharmacyName || null;
+
+        // Clone schedule and add pharmacy info to appointments
+        const scheduleToSave = JSON.parse(JSON.stringify(state.schedule));
+
+        // Add pharmacy info to each appointment if logged in as pharmacy
+        if (pharmacyId && scheduleToSave.appointments) {
+            Object.keys(scheduleToSave.appointments).forEach(key => {
+                const apt = scheduleToSave.appointments[key];
+                // Only add pharmacy if not already set (don't overwrite)
+                if (!apt.pharmacyId) {
+                    apt.pharmacyId = pharmacyId;
+                    apt.pharmacyName = pharmacyName;
+                }
+            });
+        }
+
+        // Also store pharmacy info at schedule level for the date
+        if (pharmacyId) {
+            scheduleToSave.pharmacyId = pharmacyId;
+            scheduleToSave.pharmacyName = pharmacyName;
+        }
+
+        await setDoc(doc(db, "schedules", docId), scheduleToSave);
         await updateAvailabilityStatus(docId);
     } catch (error) {
         console.error("Error saving schedule:", error);
@@ -536,21 +590,49 @@ function initFlatpickr() {
         onOpen: async (selectedDates, dateStr, instance) => {
             const monthKey = `${instance.currentYear}-${String(instance.currentMonth + 1).padStart(2, '0')}`;
             await fetchMonthAvailability(monthKey, true);
+            await fetchAssignedDates(monthKey);
             instance.redraw();
         },
         onMonthChange: async (selectedDates, dateStr, instance) => {
             const monthKey = `${instance.currentYear}-${String(instance.currentMonth + 1).padStart(2, '0')}`;
             await fetchMonthAvailability(monthKey, true);
+            await fetchAssignedDates(monthKey);
             instance.redraw();
         },
         onDayCreate: (dObj, dStr, fp, dayElem) => {
             const dateStr = formatLocalDate(dayElem.dateObj);
             const monthKey = dateStr.substring(0, 7);
+
+            // Show full days
             if (availabilityCache[monthKey]?.[dateStr] === 'full') {
                 dayElem.classList.add('day-full');
             }
+
+            // For pharmacy users, mark assigned vs non-assigned dates
+            if (!isAdmin() && assignedDatesCache[monthKey]) {
+                const assignedDates = assignedDatesCache[monthKey];
+                if (assignedDates.includes(dateStr)) {
+                    dayElem.classList.add('date-assigned');
+                } else {
+                    dayElem.classList.add('date-not-assigned');
+                }
+            }
         },
-        onChange: (selectedDates, dateStr) => { if (dateStr) changeDate(dateStr); }
+        onChange: async (selectedDates, dateStr) => {
+            if (!dateStr) return;
+
+            // Check if pharmacy user can access this date
+            if (!isAdmin()) {
+                const { allowed, reason } = await canBookOnDate(dateStr);
+                if (!allowed) {
+                    // Show error toast and revert
+                    alert(t(reason === 'date_not_assigned' ? 'dateNotAssigned' : 'unknownError'));
+                    return;
+                }
+            }
+
+            changeDate(dateStr);
+        }
     });
 
     elements.dateDisplay?.addEventListener('click', () => flatpickrInstance?.open());
@@ -565,6 +647,25 @@ async function fetchMonthAvailability(monthKey, forceRefresh = false) {
         return availabilityCache[monthKey];
     } catch (error) {
         return availabilityCache[monthKey] || {};
+    }
+}
+
+/**
+ * Fetch assigned dates for a month (v2.0 - Controlled Reservations)
+ */
+async function fetchAssignedDates(monthKey) {
+    if (isAdmin()) {
+        // Admin sees all dates
+        assignedDatesCache[monthKey] = null;
+        return;
+    }
+
+    try {
+        const dates = await getAssignedDatesForMonth(monthKey);
+        assignedDatesCache[monthKey] = dates;
+    } catch (error) {
+        console.error('Error fetching assigned dates:', error);
+        assignedDatesCache[monthKey] = [];
     }
 }
 

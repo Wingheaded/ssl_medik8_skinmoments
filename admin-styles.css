@@ -1,0 +1,891 @@
+/**
+ * admin-styles.css - Admin Dashboard Specific Styles
+ */
+
+/* ========================================
+   Admin Layout
+   ======================================== */
+
+.admin-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-main {
+    flex: 1;
+    display: flex;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+    padding: var(--spacing-lg);
+    gap: var(--spacing-lg);
+}
+
+/* ========================================
+   Admin Badge in Header
+   ======================================== */
+
+.header__admin-badge {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: 6px 12px;
+    background-color: var(--color-primary);
+    color: white;
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.header__admin-badge .material-symbols-outlined {
+    font-size: 16px;
+}
+
+/* ========================================
+   Sidebar Navigation
+   ======================================== */
+
+.admin-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+}
+
+.admin-nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    position: sticky;
+    top: calc(80px + var(--spacing-lg));
+}
+
+.admin-nav__item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    background-color: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.admin-nav__item:hover {
+    background-color: var(--color-surface-alt);
+    color: var(--color-text);
+}
+
+.admin-nav__item.active {
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.admin-nav__item .material-symbols-outlined {
+    font-size: 20px;
+}
+
+/* ========================================
+   Content Area
+   ======================================== */
+
+.admin-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.admin-section {
+    display: none;
+}
+
+.admin-section.active {
+    display: block;
+}
+
+.admin-section__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+}
+
+.admin-section__header h2 {
+    font-size: 1.5rem;
+    font-family: var(--font-display);
+}
+
+/* ========================================
+   Cards
+   ======================================== */
+
+.admin-card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.admin-card h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: var(--spacing-md);
+    color: var(--color-text);
+}
+
+/* ========================================
+   Buttons
+   ======================================== */
+
+.admin-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.admin-btn--primary {
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.admin-btn--primary:hover {
+    background-color: var(--color-primary-dark);
+}
+
+.admin-btn--outline {
+    background-color: transparent;
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+
+.admin-btn--outline:hover {
+    background-color: var(--color-surface-alt);
+}
+
+.admin-btn--full {
+    width: 100%;
+    justify-content: center;
+}
+
+.admin-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ========================================
+   Tables
+   ======================================== */
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.admin-table th {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    background-color: var(--color-surface-alt);
+}
+
+.admin-table tbody tr:hover {
+    background-color: var(--color-surface-alt);
+}
+
+.admin-table code {
+    padding: 2px 8px;
+    background-color: var(--color-surface-alt);
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+    font-size: 13px;
+}
+
+/* ========================================
+   Badges
+   ======================================== */
+
+.admin-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-radius: var(--radius-full);
+}
+
+.admin-badge--success {
+    background-color: var(--color-checked-in-bg);
+    color: var(--color-checked-in);
+}
+
+.admin-badge--info {
+    background-color: var(--color-scheduled-bg);
+    color: var(--color-scheduled);
+}
+
+.admin-badge--danger {
+    background-color: var(--color-no-show-bg);
+    color: var(--color-no-show);
+}
+
+.admin-badge--purple {
+    background-color: var(--color-completed-bg);
+    color: var(--color-completed);
+}
+
+.admin-badge--muted {
+    background-color: var(--color-cancelled-bg);
+    color: var(--color-cancelled);
+}
+
+/* ========================================
+   Action Buttons
+   ======================================== */
+
+.admin-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.admin-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background-color: var(--color-surface-alt);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.admin-action-btn:hover {
+    background-color: var(--color-border);
+    color: var(--color-text);
+}
+
+.admin-action-btn--danger:hover {
+    background-color: var(--color-no-show-bg);
+    color: var(--color-no-show);
+}
+
+.admin-action-btn .material-symbols-outlined {
+    font-size: 18px;
+}
+
+/* ========================================
+   Empty States
+   ======================================== */
+
+.admin-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xl) var(--spacing-lg);
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+.admin-empty.hidden {
+    display: none;
+}
+
+.admin-empty .material-symbols-outlined {
+    font-size: 48px;
+    margin-bottom: var(--spacing-md);
+    opacity: 0.5;
+}
+
+.admin-empty p {
+    margin-bottom: var(--spacing-md);
+}
+
+/* ========================================
+   Forms
+   ======================================== */
+
+.admin-form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.admin-form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--spacing-xs);
+}
+
+.admin-input,
+.admin-select {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.admin-input:focus,
+.admin-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(123, 158, 137, 0.15);
+}
+
+.admin-filters {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.admin-filters .admin-select,
+.admin-filters .admin-input {
+    width: auto;
+    min-width: 180px;
+}
+
+/* ========================================
+   Date Assignment Layout
+   ======================================== */
+
+.admin-dates-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.admin-dates-calendar {
+    display: flex;
+    flex-direction: column;
+}
+
+.admin-dates-calendar .flatpickr-calendar {
+    box-shadow: none;
+    border: 1px solid var(--color-border);
+    width: 100%;
+}
+
+.admin-dates-form {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Selected Dates List */
+.selected-dates-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm);
+    min-height: 60px;
+    background-color: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.selected-dates-empty {
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.selected-date-tag {
+    display: inline-block;
+    padding: 4px 10px;
+    background-color: var(--color-primary);
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+}
+
+/* Assigned Dates Grid */
+.assigned-dates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.assigned-pharmacy-card {
+    padding: var(--spacing-md);
+    background-color: var(--color-surface-alt);
+    border-radius: var(--radius-md);
+}
+
+.assigned-pharmacy-card h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-primary);
+}
+
+.assigned-dates-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+}
+
+.assigned-date-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    font-size: 12px;
+    border-radius: var(--radius-sm);
+}
+
+.remove-date-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border: none;
+    background: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.remove-date-btn:hover {
+    color: var(--color-no-show);
+}
+
+/* Admin Calendar Styles */
+.flatpickr-day.date-assigned-admin {
+    background-color: var(--color-primary-light) !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+.flatpickr-day.date-assigned-admin:hover {
+    background-color: var(--color-primary) !important;
+}
+
+/* ========================================
+   Modal
+   ======================================== */
+
+.admin-modal {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-md);
+}
+
+.admin-modal.hidden {
+    display: none;
+}
+
+.admin-modal__backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.admin-modal__content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 480px;
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-float);
+}
+
+.admin-modal__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.admin-modal__header h3 {
+    margin: 0;
+    font-size: 1.125rem;
+}
+
+.admin-modal__close {
+    display: flex;
+    padding: 4px;
+    border: none;
+    background: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+}
+
+.admin-modal__close:hover {
+    color: var(--color-text);
+}
+
+.admin-modal__body {
+    padding: var(--spacing-lg);
+}
+
+.admin-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+}
+
+/* ========================================
+   Responsive
+   ======================================== */
+
+@media (max-width: 1024px) {
+    .admin-dates-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .admin-main {
+        flex-direction: column;
+    }
+
+    .admin-sidebar {
+        width: 100%;
+    }
+
+    .admin-nav {
+        flex-direction: row;
+        overflow-x: auto;
+        position: static;
+    }
+
+    .admin-nav__item {
+        white-space: nowrap;
+    }
+}
+
+/* ========================================
+   Blocked Dates in Calendar (Already Assigned)
+   ======================================== */
+
+.flatpickr-day.date-blocked {
+    background: repeating-linear-gradient(45deg,
+            var(--pharmacy-color, #9CA3AF),
+            var(--pharmacy-color, #9CA3AF) 2px,
+            transparent 2px,
+            transparent 6px) !important;
+    color: var(--color-text-muted) !important;
+    cursor: not-allowed !important;
+    opacity: 0.7;
+    position: relative;
+}
+
+.flatpickr-day.date-blocked::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    background-color: var(--pharmacy-color, #9CA3AF);
+    border-radius: 50%;
+}
+
+.flatpickr-day.date-blocked:hover {
+    background: repeating-linear-gradient(45deg,
+            var(--pharmacy-color, #9CA3AF),
+            var(--pharmacy-color, #9CA3AF) 2px,
+            transparent 2px,
+            transparent 6px) !important;
+    cursor: not-allowed !important;
+}
+
+/* ========================================
+   Toast Notifications
+   ======================================== */
+
+.admin-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 12px 20px;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-float);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text);
+    z-index: 9999;
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.admin-toast.visible {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+.admin-toast--warning {
+    border-color: var(--color-no-show);
+    background-color: var(--color-no-show-bg);
+}
+
+.admin-toast--warning .material-symbols-outlined {
+    color: var(--color-no-show);
+}
+
+.admin-toast--info {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary-light);
+}
+
+.admin-toast--info .material-symbols-outlined {
+    color: var(--color-primary);
+}
+
+.admin-toast .material-symbols-outlined {
+    font-size: 20px;
+}
+
+/* ========================================
+   Pharmacy Indicator in Tables
+   ======================================== */
+
+.pharmacy-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pharmacy-indicator::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: var(--pharmacy-color, var(--color-primary));
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ========================================
+   Notify Dialog & Loading (Inlined from notify.js)
+   ======================================== */
+
+.notify-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.notify-dialog__backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.notify-dialog__content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 400px;
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-float);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    animation: dialog-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.notify-dialog__content--alert {
+    text-align: center;
+}
+
+.notify-dialog__title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin: 0;
+}
+
+.notify-dialog__message {
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin: 0;
+}
+
+.notify-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.notify-dialog__content--alert .notify-dialog__actions {
+    justify-content: center;
+}
+
+.notify-dialog__btn {
+    padding: 10px 20px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+.notify-dialog__btn--primary {
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.notify-dialog__btn--primary:hover {
+    background-color: var(--color-primary-dark);
+}
+
+.notify-dialog__btn--danger {
+    background-color: var(--color-no-show);
+    color: white;
+}
+
+.notify-dialog__btn--danger:hover {
+    background-color: #DC2626;
+}
+
+.notify-dialog__btn--outline {
+    background-color: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+}
+
+.notify-dialog__btn--outline:hover {
+    background-color: var(--color-surface-alt);
+}
+
+/* Loading Overlay */
+.notify-loading {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(4px);
+}
+
+.notify-loading__content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.notify-loading__spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--color-primary-light);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.notify-loading__message {
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes dialog-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* ========================================
+   Custom Tooltip (Admin)
+   ======================================== */
+
+.admin-custom-tooltip {
+    position: fixed;
+    z-index: 10000;
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-float);
+    border: 1px solid var(--color-border);
+    font-size: 13px;
+    font-weight: 500;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    transform: translateY(5px);
+    white-space: nowrap;
+}
+
+.admin-custom-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.admin-custom-tooltip strong {
+    color: var(--color-primary);
+    font-weight: 700;
+}
