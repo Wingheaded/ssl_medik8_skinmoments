@@ -720,7 +720,7 @@ function createScheduleRow(item, appointments) {
     contentCol.className = 'schedule__content';
 
     if (item.type === 'lunch') {
-        contentCol.innerHTML = createLunchBlock();
+        contentCol.innerHTML = createLunchBlock(item.id);
     } else if (item.type === 'techBreak') {
         contentCol.innerHTML = createTechBreakBlock(item.id);
     } else if (item.type === 'bookedAppointment' && item.data) {
@@ -738,9 +738,9 @@ function createScheduleRow(item, appointments) {
     return row;
 }
 
-function createLunchBlock() {
+function createLunchBlock(id) {
     return `
-    <div class="lunch-block" id="lunchBlock">
+    <div class="lunch-block" data-block-id="${id}">
       <span class="lunch-block__title" data-i18n="lunch">${t('lunch')}</span>
       <span class="lunch-block__duration" data-i18n="lunchDuration">${t('lunchDuration')}</span>
       <span class="lunch-block__drag-handle material-symbols-outlined">drag_indicator</span>
@@ -827,13 +827,14 @@ function attachDragHandlers() {
     const { scheduleItems } = reflow(state.schedule);
 
     // Attach drag handler to lunch block
-    const lunchBlock = document.getElementById('lunchBlock');
-    if (lunchBlock) {
-        const lunchItem = scheduleItems.find(item => item.type === 'lunch');
+    // Attach drag handler to lunch block
+    document.querySelectorAll('.lunch-block').forEach(block => {
+        const blockId = block.getAttribute('data-block-id');
+        const lunchItem = scheduleItems.find(item => item.id === blockId);
         if (lunchItem) {
-            makeDraggable(lunchBlock, 'lunch', lunchItem.start, 'lunch', lunchItem.blockIndex);
+            makeDraggable(block, 'lunch', lunchItem.start, blockId, lunchItem.blockIndex);
         }
-    }
+    });
 
     // Attach drag handlers to tech breaks
     document.querySelectorAll('.techbreak-block').forEach(block => {

@@ -144,14 +144,15 @@ function handlePointerDown(e) {
     dragTarget.style.cursor = 'grabbing';
     dragTarget.style.opacity = '0.8';
     dragTarget.style.zIndex = '100';
+    dragTarget.style.transition = 'transform 0.12s ease-out';
 
     // Capture pointer
     dragTarget.setPointerCapture(e.pointerId);
 
-    // Add move and up listeners
-    document.addEventListener('pointermove', handlePointerMove);
-    document.addEventListener('pointerup', handlePointerUp);
-    document.addEventListener('pointercancel', handlePointerUp);
+    // Add move and up listeners (capture to follow touch/mouse even if leaving the element)
+    document.addEventListener('pointermove', handlePointerMove, { passive: false });
+    document.addEventListener('pointerup', handlePointerUp, { passive: false });
+    document.addEventListener('pointercancel', handlePointerUp, { passive: false });
 }
 
 /**
@@ -178,8 +179,24 @@ function handlePointerMove(e) {
         deltaY: deltaY
     });
 
-    // Visual feedback with transform
-    dragTarget.style.transform = `translateY(${deltaY}px)`;
+    // Smooth follow to finger/mouse
+    if (dragTarget) {
+        dragTarget.style.transform = `translateY(${deltaY}px)`;
+    }
+
+    // Auto-scroll logic
+    const SCROLL_ZONE_SIZE = 60; // Determine auto-scroll zone size
+    const SCROLL_SPEED = 10; // Scroll speed
+
+    if (e.clientY < SCROLL_ZONE_SIZE) {
+        // Scroll up
+        startAutoScroll(-SCROLL_SPEED);
+    } else if (window.innerHeight - e.clientY < SCROLL_ZONE_SIZE) {
+        // Scroll down
+        startAutoScroll(SCROLL_SPEED);
+    } else {
+        stopAutoScroll();
+    }
 }
 
 /**
@@ -190,6 +207,7 @@ function handlePointerUp(e) {
     if (!isDragging) return;
 
     isDragging = false;
+    stopAutoScroll(); // Stop auto-scrolling
 
     // Reset visual feedback
     if (dragTarget) {
@@ -197,6 +215,7 @@ function handlePointerUp(e) {
         dragTarget.style.opacity = '';
         dragTarget.style.zIndex = '';
         dragTarget.style.transform = '';
+        dragTarget.style.transition = '';
         dragTarget.releasePointerCapture(e.pointerId);
     }
 
@@ -205,7 +224,7 @@ function handlePointerUp(e) {
     document.removeEventListener('pointerup', handlePointerUp);
     document.removeEventListener('pointercancel', handlePointerUp);
 
-    // Calculate final position
+    // Calculate final position (viewport-relative like pointermove)
     const relativeY = e.clientY - scheduleTop;
     const toIndex = yToBlockPosition(relativeY);
 
@@ -242,6 +261,7 @@ export function cancelDrag() {
     }
 
     isDragging = false;
+    stopAutoScroll();
     dragTarget = null;
     dragType = null;
     dragBlockId = null;
@@ -261,4 +281,30 @@ export function cancelDrag() {
  */
 export function isDraggingActive() {
     return isDragging;
+}
+
+// ==========================================
+// Auto-Scroll Helpers
+// ==========================================
+
+let autoScrollInterval = null;
+
+function startAutoScroll(step) {
+    if (autoScrollInterval) return; // Already scrolling
+
+    autoScrollInterval = setInterval(() => {
+        window.scrollBy(0, step);
+
+        // Update drag target position visually during scroll
+        // This is tricky because pointermove doesn't fire just by scrolling
+        // But the transform is based on relative movement from startY, which might drift if we don't account for scroll.
+        // Actually simplest is just to scroll. Pointer capture keeps the element moving.
+    }, 16); // ~60fps
+}
+
+function stopAutoScroll() {
+    if (autoScrollInterval) {
+        clearInterval(autoScrollInterval);
+        autoScrollInterval = null;
+    }
 }

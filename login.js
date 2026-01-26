@@ -80,7 +80,7 @@ function createLoginModal() {
     modal.className = 'login-modal';
     modal.innerHTML = `
         <div class="login-modal__backdrop"></div>
-        <div class="login-modal__content">
+        <div class="login-modal__content" style="width: 90%; max-width: 400px; margin: 0 auto;">
             <div class="login-modal__header">
                 <img src="./assets/medik8-logo.svg" alt="Medik8" class="login-modal__logo">
                 <h2 class="login-modal__title" data-i18n="loginTitle">Skin Moments Scheduler</h2>
