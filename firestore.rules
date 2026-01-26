@@ -7,103 +7,98 @@ service cloud.firestore {
     // Helper Functions
     // ==========================================
     
-    // Check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Check if user is admin (by email)
+    // Secure Admin Check: Hardcoded Owner OR Role in Firestore
     function isAdmin() {
-      return isAuthenticated() && 
-             request.auth.token.email == 'alexandra@skinselflove.pt';
+      return isAuthenticated() && (
+        request.auth.token.email == 'alexandra@skinselflove.pt' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'owner'])
+      );
     }
     
-    // Check if user owns the pharmacy
     function isPharmacyOwner(pharmacyId) {
-      return isAuthenticated() && 
-             request.auth.token.pharmacyId == pharmacyId;
+      return isAuthenticated() && request.auth.token.pharmacyId == pharmacyId;
     }
     
-    // Check if date is assigned to user's pharmacy
     function isDateAssignedToUser(dateStr) {
       return isAdmin() || 
-             exists(/databases/$(database)/documents/dateAssignments/$(dateStr)) &&
-             get(/databases/$(database)/documents/dateAssignments/$(dateStr)).data.pharmacyId == request.auth.token.pharmacyId;
+             (exists(/databases/$(database)/documents/dateAssignments/$(dateStr)) &&
+             get(/databases/$(database)/documents/dateAssignments/$(dateStr)).data.pharmacyId == request.auth.token.pharmacyId);
     }
 
     // ==========================================
-    // Pharmacies Collection
+    // Users & RBAC (NEW)
+    // ==========================================
+
+    match /users/{userId} {
+      // Owner/Admin can read/write all users
+      // Users can read their own profile
+      allow read: if isAdmin() || request.auth.uid == userId;
+      
+      // Creation restricted to:
+      // 1. User is authenticated
+      // 2. User info matches auth
+      // 3. User email exists in 'invites' collection
+      allow create: if isAuthenticated() && 
+                      request.auth.uid == userId &&
+                      exists(/databases/$(database)/documents/invites/$(request.resource.data.email));
+                      
+      allow update, delete: if isAdmin();
+    }
+
+    match /invites/{email} {
+      // Admins manage invites
+      allow read, write: if isAdmin();
+      // Users can check IF they are invited (by known email ID)
+      allow read: if isAuthenticated() && request.auth.token.email == email;
+    }
+
+    // ==========================================
+    // Core Collections
     // ==========================================
     
     match /pharmacies/{pharmacyId} {
-      // Anyone authenticated can read pharmacy list (for login dropdown)
       allow read: if true;
-      
-      // Only admin can create/update/delete pharmacies
       allow write: if isAdmin();
     }
 
-    // ==========================================
-    // Config Collection (Admin settings)
-    // ==========================================
-    
     match /config/{configId} {
-      // Admin password check happens client-side, but config read is protected
-      allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
-
-    // ==========================================
-    // Date Assignments Collection
-    // ==========================================
     
-    match /dateAssignments/{dateStr} {
-      // Authenticated users can read to check their assignments
-      allow read: if true;
-      
-      // Only admin can assign/unassign dates
-      allow write: if isAdmin();
+    match /admins/{adminId} {
+      // Legacy Admin Collection - readable by new Admins for migration
+      allow read, write: if isAdmin();
     }
 
-    // ==========================================
-    // Reservations Collection
-    // ==========================================
+    match /dateAssignments/{dateStr} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
     
     match /reservations/{reservationId} {
-      // Users can read their own pharmacy's reservations
-      // Admin can read all
-      allow read: if isAdmin() || 
-                    resource.data.pharmacyId == request.auth.token.pharmacyId;
-      
-      // Create: User must be assigned to the date
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.pharmacyId == request.auth.token.pharmacyId);
       allow create: if isDateAssignedToUser(request.resource.data.date) &&
-                      (isAdmin() || request.resource.data.pharmacyId == request.auth.token.pharmacyId);
-      
-      // Update: Owner or admin can update
-      allow update: if isAdmin() || 
-                      resource.data.pharmacyId == request.auth.token.pharmacyId;
-      
-      // Delete: Only admin can hard-delete (use status: cancelled for soft delete)
+                      (isAdmin() || (isAuthenticated() && request.resource.data.pharmacyId == request.auth.token.pharmacyId));
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.pharmacyId == request.auth.token.pharmacyId);
       allow delete: if isAdmin();
     }
 
     // ==========================================
-    // Legacy: Schedules Collection (v1 compatibility)
+    // Helpers / Legacy
     // ==========================================
     
     match /schedules/{dateStr} {
-      // Allow read/write for backward compatibility during migration
-      // TODO: Remove after migration complete
       allow read, write: if true;
     }
 
-    // ==========================================
-    // Month Availability (Calendar dots)
-    // ==========================================
-    
     match /month_availability/{monthKey} {
       allow read: if true;
-      allow write: if true; // Updated by client on booking
+      allow write: if true;
     }
   }
 }
