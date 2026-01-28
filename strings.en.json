@@ -97,6 +97,7 @@
     "invalidPin": "Invalid PIN",
     "invalidPassword": "Invalid password",
     "adminNotConfigured": "Admin not configured",
+    "email": "Email",
     "networkError": "Network error",
     "unknownError": "Unknown error",
     "noPharmaciesAvailable": "No pharmacies available",

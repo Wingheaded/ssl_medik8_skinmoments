@@ -109,23 +109,37 @@ export async function loginPharmacy(id, pin) {
         }
 
         const data = docSnap.data();
-        if (data.pin !== pin) {
-            return { success: false, error: 'invalid_pin' };
-        }
-
         if (!data.active) {
             return { success: false, error: 'pharmacy_inactive' };
         }
 
-        const session = {
-            isAdmin: false,
-            pharmacyId: id,
-            name: data.name,
-            loginAt: new Date().toISOString()
-        };
+        // Construct standardized email and strict password from PIN
+        const email = `${id}@medik8.local`;
+        // Ensure "00" padding logic matches migration
+        const password = pin.length < 6 ? `${pin}00` : pin;
 
-        localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-        return { success: true, session };
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+
+            // Success! Create session object
+            const session = {
+                isAdmin: false,
+                pharmacyId: id,
+                name: data.name,
+                loginAt: new Date().toISOString()
+            };
+
+            localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+            return { success: true, session };
+
+        } catch (authError) {
+            console.error("Auth failed:", authError);
+            if (authError.code === 'auth/wrong-password' || authError.code === 'auth/invalid-credential') {
+                // Map to legacy "invalid_pin" error for UI consistency
+                return { success: false, error: 'invalid_pin' };
+            }
+            return { success: false, error: authError.code };
+        }
     } catch (error) {
         console.error('Pharmacy login error:', error);
         return { success: false, error: 'network_error' };

@@ -304,11 +304,20 @@ function initNavigation() {
 async function loadPharmacies() {
     try {
         const pharmaciesRef = collection(db, 'pharmacies');
-        const snapshot = await getDocs(pharmaciesRef);
+        const [pharmSnap, secretsSnap] = await Promise.all([
+            getDocs(pharmaciesRef),
+            getDocs(collection(db, 'pharmacy_secrets'))
+        ]);
 
-        pharmacies = snapshot.docs.map(doc => ({
+        const secretsMap = {};
+        secretsSnap.docs.forEach(d => {
+            secretsMap[d.id] = d.data().pin;
+        });
+
+        pharmacies = pharmSnap.docs.map(doc => ({
             id: doc.id,
-            ...doc.data()
+            ...doc.data(),
+            pin: secretsMap[doc.id] || '' // Merge secure PIN
         }));
 
         pharmaciesById = buildPharmacyMap(pharmacies);
@@ -564,13 +573,20 @@ async function savePharmacy() {
 
     try {
         const docId = pharmacyId || `pharmacy_${Date.now()}`;
+
+        // 1. Save Public Data (NO PIN)
         await setDoc(doc(db, 'pharmacies', docId), {
             name,
             contact,
-            pin,
             active,
             updatedAt: new Date().toISOString()
         }, { merge: true });
+
+        // 2. Save Secure PIN
+        await setDoc(doc(db, 'pharmacy_secrets', docId), {
+            pin,
+            updatedAt: new Date().toISOString()
+        });
 
         // Update denormalized names in associated collections if editing
         if (pharmacyId) {

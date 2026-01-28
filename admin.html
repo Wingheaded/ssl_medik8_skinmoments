@@ -100,7 +100,15 @@
                     </button>
                 </div>
 
-                <div class="admin-card">
+                <div class="admin-filters admin-filters--pharmacies">
+                    <div class="admin-form-group">
+                        <label for="pharmacySearchInput">Procurar Farmácia</label>
+                        <input class="admin-input" id="pharmacySearchInput" type="search"
+                            placeholder="Nome, contacto ou PIN">
+                    </div>
+                </div>
+
+                <div class="admin-card admin-card--table">
                     <table class="admin-table" id="pharmaciesTable">
                         <thead>
                             <tr>
@@ -180,15 +188,45 @@
             <section class="admin-section" id="reservationsSection">
                 <div class="admin-section__header">
                     <h2>Todas as Reservas</h2>
-                    <div class="admin-filters">
-                        <select class="admin-select" id="filterPharmacy">
-                            <option value="">Todas as Farmácias</option>
-                        </select>
-                        <input type="date" class="admin-input" id="filterDate">
+                    <div class="admin-section__controls">
+                        <div class="admin-filters admin-section__filters">
+                            <select class="admin-select" id="filterPharmacy">
+                                <option value="">Todas as Farmácias</option>
+                            </select>
+                            <input type="date" class="admin-input" id="filterDate">
+                        </div>
+                        <div class="admin-section__actions">
+                            <button class="admin-btn admin-btn--outline" id="exportReservationsCsvBtn" type="button">
+                                <span class="material-symbols-outlined">download</span>
+                                Exportar CSV
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <div class="admin-card">
+                    <div class="admin-card__header">
+                        <h3>Resumo Mensal</h3>
+                        <div class="admin-filters">
+                            <div class="admin-form-group">
+                                <label for="monthlySummaryMonth">Mês</label>
+                                <input type="month" class="admin-input" id="monthlySummaryMonth">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="monthly-summary-meta">
+                        <span>Total de reservas no mês: <strong id="monthlySummaryTotal">0</strong></span>
+                    </div>
+                    <div class="monthly-summary-grid" id="monthlySummaryGrid">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                    <div class="admin-empty hidden" id="monthlySummaryEmpty">
+                        <span class="material-symbols-outlined">event_busy</span>
+                        <p>Nenhuma reserva neste mês</p>
+                    </div>
+                </div>
+
+                <div class="admin-card admin-card--table">
                     <table class="admin-table" id="reservationsTable">
                         <thead>
                             <tr>
@@ -221,7 +259,7 @@
                     </button>
                 </div>
 
-                <div class="admin-card">
+                <div class="admin-card admin-card--table">
                     <table class="admin-table" id="adminsTable">
                         <thead>
                             <tr>
@@ -242,6 +280,82 @@
                 </div>
             </section>
         </div>
+    </main>
+
+    <!-- Add/Edit Pharmacy Modal -->
+    <div class="admin-modal hidden" id="pharmacyModal">
+        <div class="admin-modal__backdrop"></div>
+        <div class="admin-modal__content">
+            <div class="admin-modal__header">
+                <h3 id="pharmacyModalTitle">Nova Farmácia</h3>
+                <button class="admin-modal__close" id="closePharmacyModal">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="admin-modal__body">
+                <input type="hidden" id="pharmacyId">
+                <div class="admin-form-group">
+                    <label>Nome da Farmácia</label>
+                    <input type="text" class="admin-input" id="pharmacyNameInput" placeholder="Ex: Farmácia Central">
+                </div>
+                <div class="admin-form-group">
+                    <label>Contacto</label>
+                    <input type="text" class="admin-input" id="pharmacyContactInput" placeholder="Email ou telefone">
+                </div>
+                <div class="admin-form-group">
+                    <label>PIN (4 dígitos)</label>
+                    <input type="text" class="admin-input" id="pharmacyPinInput" maxlength="4" pattern="[0-9]{4}"
+                        placeholder="••••">
+                </div>
+                <div class="admin-form-group">
+                    <label>
+                        <input type="checkbox" id="pharmacyActiveInput" checked>
+                        Farmácia Ativa
+                    </label>
+                </div>
+            </div>
+            <div class="admin-modal__footer">
+                <button class="admin-btn admin-btn--outline" id="cancelPharmacyModal">Cancelar</button>
+                <button class="admin-btn admin-btn--primary" id="savePharmacyBtn">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Admin User Modal -->
+    <div class="admin-modal hidden" id="adminUserModal">
+        <div class="admin-modal__backdrop"></div>
+        <div class="admin-modal__content">
+            <div class="admin-modal__header">
+                <h3 id="adminUserModalTitle">Novo Administrador</h3>
+                <button class="admin-modal__close" id="closeAdminUserModal">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="admin-modal__body">
+                <input type="hidden" id="adminUserId">
+                <div class="admin-form-group">
+                    <label>Nome</label>
+                    <input type="text" class="admin-input" id="adminUserNameInput" placeholder="Ex: Maria Santos">
+                </div>
+                <div class="admin-form-group">
+                    <label>Email</label>
+                    <input type="email" class="admin-input" id="adminUserEmailInput" placeholder="admin@medik8.pt">
+                </div>
+                <div class="admin-form-group">
+                    <label>Senha</label>
+                    <div class="password-input-wrapper">
+                        <input type="text" class="admin-input" id="adminUserPasswordInput" placeholder="Senha forte">
+                        <small class="form-hint">Mínimo 6 caracteres</small>
+                    </div>
+                </div>
+            </div>
+            <div class="admin-modal__footer">
+                <button class="admin-btn admin-btn--outline" id="cancelAdminUserModal">Cancelar</button>
+                <button class="admin-btn admin-btn--primary" id="saveAdminUserBtn">Guardar</button>
+            </div>
+        </div>
+        </section>
+    </div>
     </main>
 
     <!-- Add/Edit Pharmacy Modal -->

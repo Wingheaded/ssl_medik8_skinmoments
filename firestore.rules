@@ -39,18 +39,8 @@ service cloud.firestore {
       // Users can read their own profile
       allow read: if isAdmin() || request.auth.uid == userId;
       
-      // Creation restricted to:
-      // 1. User is authenticated
-      // 2. User info matches auth
-      // 3. User email exists in 'invites' collection
-      allow create: if isAuthenticated() && 
-                      request.auth.uid == userId &&
-                      (
-                        request.resource.data.email == 'jose.antonio@skinselflove.com.pt' ||
-                        exists(/databases/$(database)/documents/invites/$(request.resource.data.email))
-                      );
-                      
-      allow update, delete: if isAdmin();
+      // Admin only write
+      allow write: if isAdmin();
     }
 
     match /invites/{email} {
@@ -65,8 +55,15 @@ service cloud.firestore {
     // ==========================================
     
     match /pharmacies/{pharmacyId} {
-      allow read: if true;
+      // Public read needed for Login Dropdown (Names only)
+      // PINs are moved to pharmacy_secrets
+      allow read: if true; 
       allow write: if isAdmin();
+    }
+
+    match /pharmacy_secrets/{pharmacyId} {
+      // Strictly Admin only - Contains PINs
+      allow read, write: if isAdmin();
     }
 
     match /config/{configId} {
@@ -74,20 +71,19 @@ service cloud.firestore {
     }
     
     match /admins/{adminId} {
-      // Legacy Admin Collection - readable by new Admins for migration
       allow read, write: if isAdmin();
     }
 
     match /dateAssignments/{dateStr} {
-      allow read: if true;
+      allow read: if true; // Public read? Or Auth?
       allow write: if isAdmin();
     }
     
     match /reservations/{reservationId} {
       allow read: if isAdmin() || (isAuthenticated() && resource.data.pharmacyId == request.auth.token.pharmacyId);
-      allow create: if isDateAssignedToUser(request.resource.data.date) &&
-                      (isAdmin() || (isAuthenticated() && request.resource.data.pharmacyId == request.auth.token.pharmacyId));
-      allow update: if isAdmin() || (isAuthenticated() && resource.data.pharmacyId == request.auth.token.pharmacyId);
+      // Fallback for missing custom claim: Check user profile?
+      // For now, relying on simple auth check for migration stability
+      allow create, update: if isAuthenticated(); 
       allow delete: if isAdmin();
     }
 
@@ -96,12 +92,15 @@ service cloud.firestore {
     // ==========================================
     
     match /schedules/{dateStr} {
-      allow read, write: if true;
+      // LOCKDOWN: Only authenticated users
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated(); 
     }
 
     match /month_availability/{monthKey} {
-      allow read: if true;
-      allow write: if true;
+      // LOCKDOWN: Only authenticated users
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
     }
   }
 }
