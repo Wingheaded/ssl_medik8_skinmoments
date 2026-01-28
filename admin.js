@@ -4,6 +4,7 @@
  */
 
 import { db } from './firebase-config.js';
+import { reflow } from './scheduler.js';
 import {
     collection,
     doc,
@@ -175,6 +176,8 @@ let selectedDates = [];
 let lockedDates = new Set();
 let dateAssignmentCalendar = null;
 let bookingsByDate = {}; // { [date]: { total, booked } }
+let pharmacySearchQuery = '';
+let monthlySummaryMonth = '';
 const MAX_BOOKABLE_SLOTS = 11; // 11 slots per day (with lunch + 2 tech breaks)
 
 // ==========================================
@@ -209,6 +212,8 @@ async function initializeAdmin() {
     initNavigation();
     initModals();
     initDateAssignmentCalendar();
+    initMonthlySummary();
+    initTableDragScroll();
 
     // Load data
     await loadPharmacies();
@@ -227,6 +232,11 @@ async function initializeAdmin() {
         updateSelectedDatesList();
         updateAssignButton();
     });
+    document.getElementById('pharmacySearchInput')?.addEventListener('input', (e) => {
+        pharmacySearchQuery = e.target.value || '';
+        filterAndRenderPharmacies();
+    });
+    document.getElementById('exportReservationsCsvBtn')?.addEventListener('click', exportReservationsCsv);
 
     // Admin management listeners
     document.getElementById('addAdminBtn')?.addEventListener('click', () => openAdminUserModal());
@@ -303,27 +313,127 @@ async function loadPharmacies() {
 
         pharmaciesById = buildPharmacyMap(pharmacies);
 
-        renderPharmaciesTable();
+        filterAndRenderPharmacies();
         populatePharmacyDropdowns();
     } catch (error) {
         console.error('Error loading pharmacies:', error);
     }
 }
 
-function renderPharmaciesTable() {
+function initTableDragScroll() {
+    const containers = document.querySelectorAll('.admin-card--table');
+    containers.forEach(container => enableDragScroll(container));
+}
+
+function enableDragScroll(container) {
+    if (!container) return;
+
+    let isDown = false;
+    let startX = 0;
+    let startY = 0;
+    let scrollLeft = 0;
+    let hasMoved = false;
+    const threshold = 6;
+
+    const canScroll = () => container.scrollWidth > container.clientWidth;
+
+    const onDown = (x, y) => {
+        if (!canScroll()) return;
+        isDown = true;
+        hasMoved = false;
+        startX = x;
+        startY = y;
+        scrollLeft = container.scrollLeft;
+        container.classList.add('is-dragging');
+    };
+
+    const onMove = (x, y, event) => {
+        if (!isDown) return;
+        const dx = x - startX;
+        const dy = y - startY;
+        const movedEnough = Math.abs(dx) > threshold || Math.abs(dy) > threshold;
+
+        if (!hasMoved && !movedEnough) return;
+
+        if (Math.abs(dx) < Math.abs(dy)) {
+            return;
+        }
+
+        hasMoved = true;
+        container.scrollLeft = scrollLeft - dx;
+        if (event) event.preventDefault();
+    };
+
+    const onUp = () => {
+        if (!isDown) return;
+        isDown = false;
+        container.classList.remove('is-dragging');
+    };
+
+    const isInteractiveTarget = (target) => {
+        if (!target || !target.closest) return false;
+        return !!target.closest('button, a, input, select, textarea, [role="button"], .admin-action-btn');
+    };
+
+    if (window.PointerEvent) {
+        container.addEventListener('pointerdown', (event) => {
+            if (event.pointerType !== 'mouse') return;
+            if (event.button !== 0) return;
+            if (isInteractiveTarget(event.target)) return;
+            onDown(event.clientX, event.clientY);
+            if (event.pointerType === 'mouse') {
+                try { container.setPointerCapture(event.pointerId); } catch (err) { }
+            }
+        });
+
+        container.addEventListener('pointermove', (event) => {
+            onMove(event.clientX, event.clientY, event);
+        }, { passive: false });
+
+        container.addEventListener('pointerup', onUp);
+        container.addEventListener('pointercancel', onUp);
+        container.addEventListener('pointerleave', onUp);
+    } else {
+        container.addEventListener('mousedown', (event) => {
+            if (event.button !== 0) return;
+            onDown(event.clientX, event.clientY);
+        });
+
+        container.addEventListener('mousemove', (event) => {
+            onMove(event.clientX, event.clientY, event);
+        });
+
+        container.addEventListener('mouseup', onUp);
+        container.addEventListener('mouseleave', onUp);
+    }
+}
+
+function renderPharmaciesTable(listToRender = pharmacies, searchQuery = '') {
     const tbody = document.getElementById('pharmaciesTableBody');
     const empty = document.getElementById('pharmaciesEmpty');
+    const emptyMessage = empty?.querySelector('p');
+    const addBtn = document.getElementById('addFirstPharmacyBtn');
 
-    if (pharmacies.length === 0) {
+    const normalizedQuery = typeof searchQuery === 'string' ? searchQuery.trim() : '';
+
+    if (listToRender.length === 0) {
         if (tbody) tbody.innerHTML = '';
+        if (emptyMessage) {
+            emptyMessage.textContent = pharmacies.length === 0
+                ? 'Nenhuma farmácia registada'
+                : (normalizedQuery ? `Sem resultados para "${normalizedQuery}"` : 'Sem resultados');
+        }
+        if (pharmacies.length === 0) addBtn?.classList.remove('hidden');
+        else addBtn?.classList.add('hidden');
         empty?.classList.remove('hidden');
         return;
     }
 
     empty?.classList.add('hidden');
+    addBtn?.classList.add('hidden');
 
     if (tbody) {
-        tbody.innerHTML = pharmacies.map(pharmacy => `
+        tbody.innerHTML = listToRender.map(pharmacy => `
             <tr>
                 <td><strong>${pharmacy.name}</strong></td>
                 <td>${pharmacy.contact || '-'}</td>
@@ -346,6 +456,24 @@ function renderPharmaciesTable() {
             </tr>
         `).join('');
     }
+}
+
+function filterAndRenderPharmacies() {
+    const query = pharmacySearchQuery.trim().toLowerCase();
+
+    if (!query) {
+        renderPharmaciesTable(pharmacies, '');
+        return;
+    }
+
+    const filtered = pharmacies.filter(pharmacy => {
+        const name = (pharmacy.name || '').toLowerCase();
+        const contact = (pharmacy.contact || '').toLowerCase();
+        const pin = String(pharmacy.pin || '').toLowerCase();
+        return name.includes(query) || contact.includes(query) || pin.includes(query);
+    });
+
+    renderPharmaciesTable(filtered, pharmacySearchQuery);
 }
 
 function populatePharmacyDropdowns() {
@@ -514,11 +642,13 @@ function initDateAssignmentCalendar() {
             const dateStr = formatLocalDate(dayElem.dateObj);
             const assignment = dateAssignments[dateStr];
             const pharmacyId = document.getElementById('assignPharmacySelect')?.value;
+            const blockedByAssignment = isDateBlockedForPharmacy(dateStr, pharmacyId);
 
             // Reset any stale classes/attrs from previous renders
             dayElem.classList.remove('date-blocked', 'date-locked', 'date-locked-full', 'date-locked-other');
             dayElem.removeAttribute('data-pharmacy');
             dayElem.removeAttribute('title');
+            dayElem.removeAttribute('aria-disabled');
             dayElem.style.removeProperty('--pharmacy-color');
 
             if (assignment) {
@@ -537,6 +667,11 @@ function initDateAssignmentCalendar() {
                 dayElem.addEventListener('mousemove', (e) => updateTooltipPosition(e));
 
                 dayElem.style.setProperty('--pharmacy-color', getPharmacyColor(assignment.pharmacyId));
+            }
+
+            // Prevent interaction when the date is assigned to another pharmacy
+            if (blockedByAssignment) {
+                disableDayElement(dayElem, assignment ? `Atribuído a ${assignment.pharmacyName}` : 'Data atribuída');
             }
 
             // Only show locked styling when the date is assigned AND has bookings
@@ -571,6 +706,22 @@ function getPharmacyColor(pharmacyId) {
         hash = hash & hash;
     }
     return colors[Math.abs(hash) % colors.length];
+}
+
+function isDateBlockedForPharmacy(dateStr, pharmacyId) {
+    const assignment = dateAssignments[dateStr];
+
+    // If the date is assigned to a different pharmacy (or no pharmacy is selected), it is blocked
+    if (!assignment) return false;
+    if (!pharmacyId) return true;
+    return assignment.pharmacyId !== pharmacyId;
+}
+
+function disableDayElement(dayElem, titleText = '') {
+    dayElem.classList.add('flatpickr-disabled', 'date-locked-other');
+    dayElem.setAttribute('aria-disabled', 'true');
+    if (titleText) dayElem.setAttribute('title', titleText);
+    dayElem.addEventListener('click', (e) => e.preventDefault());
 }
 
 function formatLocalDate(date) {
@@ -627,18 +778,13 @@ function filterSelectedDatesForPharmacy() {
 
     selected.forEach(d => {
         const ds = formatLocalDate(d);
-        const assignment = dateAssignments[ds];
 
-        if (!assignment || assignment.pharmacyId === pharmacyId) {
-            allowed.push(d);
+        if (isDateBlockedForPharmacy(ds, pharmacyId)) {
+            blockedCount++;
             return;
         }
 
-        if (!lockedDates.has(ds)) {
-            allowed.push(d);
-        } else {
-            blockedCount++;
-        }
+        allowed.push(d);
     });
 
     if (blockedCount > 0) {
@@ -646,7 +792,7 @@ function filterSelectedDatesForPharmacy() {
         if (allowed.length > 0) {
             dateAssignmentCalendar.setDate(allowed, true);
         }
-        showToast(`${blockedCount} data(s) bloqueada(s) por outra farmácia`, 'warning');
+        showToast(`${blockedCount} data(s) já atribuída(s) a outra farmácia`, 'warning');
     }
 }
 
@@ -663,6 +809,7 @@ async function loadDateAssignments() {
         await reconcileAssignmentNames();
         renderAssignedDatesGrid();
         dateAssignmentCalendar?.redraw();
+        filterSelectedDatesForPharmacy();
     } catch (error) {
         console.error('Error loading date assignments:', error);
     }
@@ -756,8 +903,14 @@ async function assignDates() {
 }
 
 window.removeAssignment = async function (dateStr) {
+    const bookingInfo = bookingsByDate[dateStr];
+    const hasBookings = bookingInfo && bookingInfo.booked > 0;
+    const confirmMessage = hasBookings
+        ? `Esta data já tem marcações. Tem a certeza que quer remover a atribuição de ${dateStr}?`
+        : `Remover atribuição de ${dateStr}?`;
+
     const confirm = await showConfirm(
-        `Remover atribuição de ${dateStr}?`,
+        confirmMessage,
         { confirmText: 'Remover', confirmStyle: 'danger' }
     );
 
@@ -792,14 +945,28 @@ async function loadReservations() {
             let dayHasBookings = false;
             let bookedCount = 0;
             let totalCount = MAX_BOOKABLE_SLOTS;
+            let timeByBlockId = {};
+
+            const hasAppointments = data.appointments && Object.keys(data.appointments).length > 0;
+
+            if (hasAppointments) {
+                try {
+                    const reflowed = reflow(data);
+                    timeByBlockId = reflowed.appointments.reduce((acc, apt) => {
+                        acc[apt.id] = apt.start;
+                        return acc;
+                    }, {});
+                } catch (error) {
+                    timeByBlockId = {};
+                }
+            }
 
             if (data.appointments) {
                 Object.entries(data.appointments).forEach(([blockId, apt]) => {
-                    if (!apt) return;
-                    if (apt.isBooked) {
-                        dayHasBookings = true;
-                        bookedCount += 1;
-                    }
+                    const normalized = normalizeAppointment(apt, blockId);
+                    if (!normalized) return;
+                    dayHasBookings = true;
+                    bookedCount += 1;
 
                     let pharmacyId = apt.pharmacyId || data.pharmacyId || null;
                     let pharmacyName = apt.pharmacyName || data.pharmacyName || null;
@@ -812,12 +979,12 @@ async function loadReservations() {
                     reservations.push({
                         id: `${dateStr}_${blockId}`,
                         date: dateStr,
-                        timeSlot: apt.time || blockId,
+                        timeSlot: timeByBlockId[blockId] || apt.time || blockId,
                         pharmacyId: pharmacyId || 'unknown',
                         pharmacyName: pharmacyName || 'Sem farmácia',
-                        clientName: apt.name || 'N/A',
-                        clientContact: apt.contact || '',
-                        status: apt.status || 'scheduled'
+                        clientName: normalized.name,
+                        clientContact: normalized.contact,
+                        status: normalized.status
                     });
                 });
             }
@@ -830,9 +997,73 @@ async function loadReservations() {
         renderReservationsTable();
         setupReservationFilters();
         dateAssignmentCalendar?.redraw();
+        renderMonthlySummary();
     } catch (error) {
         console.error('Error loading reservations:', error);
     }
+}
+
+function initMonthlySummary() {
+    const input = document.getElementById('monthlySummaryMonth');
+    if (!input) return;
+
+    monthlySummaryMonth = getCurrentMonthValue();
+    input.value = monthlySummaryMonth;
+
+    input.addEventListener('change', () => {
+        monthlySummaryMonth = input.value || getCurrentMonthValue();
+        renderMonthlySummary();
+    });
+}
+
+function getCurrentMonthValue() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+}
+
+function renderMonthlySummary() {
+    const grid = document.getElementById('monthlySummaryGrid');
+    const empty = document.getElementById('monthlySummaryEmpty');
+    const totalEl = document.getElementById('monthlySummaryTotal');
+
+    if (!grid || !totalEl) return;
+
+    const monthKey = monthlySummaryMonth || getCurrentMonthValue();
+    const monthReservations = reservations.filter(r => r.date && r.date.startsWith(monthKey));
+    const summaryMap = new Map();
+
+    const activeReservations = monthReservations.filter(r => r.status !== 'cancelled');
+
+    activeReservations.forEach(r => {
+        const pharmacyId = r.pharmacyId || 'unknown';
+        const pharmacyName = r.pharmacyName || 'Sem farmácia';
+        const entry = summaryMap.get(pharmacyId) || { name: pharmacyName, count: 0 };
+        entry.count += 1;
+        summaryMap.set(pharmacyId, entry);
+    });
+
+    const summaryList = Array.from(summaryMap.values()).sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return a.name.localeCompare(b.name);
+    });
+
+    totalEl.textContent = String(activeReservations.length);
+
+    if (summaryList.length === 0) {
+        grid.innerHTML = '';
+        empty?.classList.remove('hidden');
+        return;
+    }
+
+    empty?.classList.add('hidden');
+    grid.innerHTML = summaryList.map(item => `
+        <div class="monthly-summary-card">
+            <div class="monthly-summary-card__title">${item.name}</div>
+            <div class="monthly-summary-card__count">${item.count}</div>
+        </div>
+    `).join('');
 }
 
 function setupReservationFilters() {
@@ -847,6 +1078,10 @@ function setupReservationFilters() {
 }
 
 function filterAndRenderReservations() {
+    renderReservationsTable(getFilteredReservations());
+}
+
+function getFilteredReservations() {
     const pharmacyFilter = document.getElementById('filterPharmacy')?.value || '';
     const dateFilter = document.getElementById('filterDate')?.value || '';
 
@@ -854,7 +1089,7 @@ function filterAndRenderReservations() {
     if (pharmacyFilter) filtered = filtered.filter(r => r.pharmacyId === pharmacyFilter);
     if (dateFilter) filtered = filtered.filter(r => r.date === dateFilter);
 
-    renderReservationsTable(filtered);
+    return filtered;
 }
 
 function renderReservationsTable(listToRender = reservations) {
@@ -897,6 +1132,64 @@ function renderReservationsTable(listToRender = reservations) {
     `).join('');
 }
 
+function exportReservationsCsv() {
+    const rows = getFilteredReservations();
+    const headers = ['Data', 'Hora', 'Farmacia', 'Cliente', 'Contacto', 'Estado'];
+
+    const csvLines = [headers.join(',')];
+
+    rows.forEach(r => {
+        const row = [
+            formatCsvDate(r.date),
+            formatCsvTime(r.timeSlot),
+            r.pharmacyName || '',
+            r.clientName || '',
+            r.clientContact || '',
+            getStatusLabel(r.status || '')
+        ].map(csvEscape).join(',');
+        csvLines.push(row);
+    });
+
+    const csvContent = `\uFEFF${csvLines.join('\n')}`;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `reservas-${formatLocalDate(new Date())}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+}
+
+function csvEscape(value) {
+    const text = String(value ?? '');
+    if (/[",\n]/.test(text)) {
+        return `"${text.replace(/"/g, '""')}"`;
+    }
+    return text;
+}
+
+function formatCsvDate(dateStr) {
+    if (!dateStr) return '';
+    const parts = String(dateStr).split('-');
+    if (parts.length !== 3) return dateStr;
+    const [year, month, day] = parts;
+    if (!year || !month || !day) return dateStr;
+    return `${day}/${month}/${year}`;
+}
+
+function formatCsvTime(timeStr) {
+    if (!timeStr) return '';
+    const text = String(timeStr).trim();
+    const match = text.match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return '';
+    const hour = match[1].padStart(2, '0');
+    const minute = match[2];
+    return `${hour}:${minute}`;
+}
+
 function getStatusClass(status) {
     const classes = { 'scheduled': 'info', 'checked-in': 'success', 'completed': 'purple', 'no-show': 'danger', 'cancelled': 'muted' };
     return classes[status] || 'muted';
@@ -905,6 +1198,31 @@ function getStatusClass(status) {
 function getStatusLabel(status) {
     const labels = { 'scheduled': 'Agendada', 'checked-in': 'Check-in', 'completed': 'Concluída', 'no-show': 'Faltou', 'cancelled': 'Cancelada' };
     return labels[status] || status;
+}
+
+function normalizeAppointment(apt, blockId) {
+    if (!apt || typeof apt !== 'object') return null;
+
+    const hasLegacyData = Boolean(apt.name || apt.contact || apt.status || apt.notes);
+    const isBooked = apt.isBooked === true || hasLegacyData;
+
+    if (!isBooked) return null;
+
+    const name = String(apt.name || '').trim() || 'N/A';
+    const contact = String(apt.contact || '').trim();
+    const notes = String(apt.notes || '').trim();
+
+    const allowedStatuses = new Set(['scheduled', 'checked-in', 'completed', 'no-show', 'cancelled']);
+    const status = allowedStatuses.has(apt.status) ? apt.status : 'scheduled';
+
+    return {
+        id: blockId,
+        isBooked: true,
+        name,
+        contact,
+        notes,
+        status
+    };
 }
 
 window.cancelReservation = async function (reservationId) {

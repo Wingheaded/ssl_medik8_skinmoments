@@ -115,6 +115,24 @@
     margin-bottom: var(--spacing-lg);
 }
 
+.admin-section__controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.admin-section__filters {
+    margin-bottom: 0;
+}
+
+.admin-section__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
 .admin-section__header h2 {
     font-size: 1.5rem;
     font-family: var(--font-display);
@@ -137,6 +155,63 @@
     font-weight: 600;
     margin-bottom: var(--spacing-md);
     color: var(--color-text);
+}
+
+.admin-card--table {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: auto;
+    cursor: grab;
+}
+
+.admin-card--table.is-dragging {
+    cursor: grabbing;
+}
+
+.admin-card--table.is-dragging * {
+    user-select: none;
+}
+
+
+.admin-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+}
+
+.monthly-summary-meta {
+    margin-bottom: var(--spacing-md);
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+}
+
+.monthly-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.monthly-summary-card {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    background: var(--color-surface-alt);
+}
+
+.monthly-summary-card__title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+}
+
+.monthly-summary-card__count {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--color-primary);
 }
 
 /* ========================================
@@ -192,6 +267,7 @@
 .admin-table {
     width: 100%;
     border-collapse: collapse;
+    min-width: 640px;
 }
 
 .admin-table th,
@@ -199,6 +275,7 @@
     padding: 12px 16px;
     text-align: left;
     border-bottom: 1px solid var(--color-border-light);
+    word-break: break-word;
 }
 
 .admin-table th {
@@ -374,6 +451,18 @@
     min-width: 180px;
 }
 
+.admin-filters--pharmacies {
+    margin-bottom: var(--spacing-md);
+}
+
+.admin-filters--pharmacies .admin-form-group {
+    flex: 1;
+}
+
+.admin-filters--pharmacies .admin-input {
+    width: 100%;
+}
+
 /* ========================================
    Date Assignment Layout
    ======================================== */
@@ -388,12 +477,26 @@
 .admin-dates-calendar {
     display: flex;
     flex-direction: column;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: auto;
+}
+
+.admin-dates-calendar #dateAssignmentCalendar {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: visible;
 }
 
 .admin-dates-calendar .flatpickr-calendar {
     box-shadow: none;
     border: 1px solid var(--color-border);
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
 }
 
 .admin-dates-form {
@@ -587,13 +690,72 @@
     }
 
     .admin-nav {
-        flex-direction: row;
-        overflow-x: auto;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--spacing-xs);
         position: static;
     }
 
     .admin-nav__item {
-        white-space: nowrap;
+        white-space: normal;
+        justify-content: center;
+        text-align: center;
+        padding: 10px 12px;
+    }
+
+    .admin-nav-divider {
+        display: none;
+    }
+
+    .admin-section__header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+    }
+
+    .admin-section__controls {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .admin-section__filters,
+    .admin-section__actions {
+        width: 100%;
+    }
+
+    .admin-section__actions .admin-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .admin-card--table {
+        overflow-x: auto;
+    }
+
+    .admin-table {
+        min-width: 560px;
+    }
+
+    .admin-dates-calendar {
+        overflow-x: auto;
+    }
+
+    .admin-dates-calendar .flatpickr-calendar {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .admin-dates-calendar #dateAssignmentCalendar {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .admin-dates-calendar .flatpickr-innerContainer,
+    .admin-dates-calendar .flatpickr-rContainer,
+    .admin-dates-calendar .flatpickr-days,
+    .admin-dates-calendar .flatpickr-weekdays {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
     }
 }
 
@@ -609,6 +771,14 @@
 
 .flatpickr-day:focus {
     outline: none;
+}
+
+.flatpickr-day.flatpickr-disabled,
+.flatpickr-day.flatpickr-disabled:hover {
+    background-color: var(--color-surface-alt) !important;
+    color: var(--color-text-muted) !important;
+    cursor: not-allowed !important;
+    opacity: 0.7;
 }
 
 .flatpickr-day:not(.selected):not(.date-blocked):not(.date-locked):not(.date-locked-full) {
@@ -648,14 +818,40 @@
     cursor: pointer !important;
     position: relative;
     border-left: 4px solid var(--pharmacy-color, #9CA3AF) !important;
+    border-left: 4px solid var(--pharmacy-color, #9CA3AF) !important;
+    position: relative;
+    font-weight: 500;
+}
+
+.flatpickr-day.date-blocked::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    background-color: var(--pharmacy-color, #9CA3AF);
+    border-radius: 50%;
+}
+
+.flatpickr-day.date-locked {
+    background-color: #FFF4D6 !important;
+    /* light yellow for days with bookings */
+    color: var(--color-text) !important;
+    cursor: pointer !important;
+    position: relative;
+    border-left: 4px solid var(--pharmacy-color, #9CA3AF) !important;
     /* keep pharmacy color */
     font-weight: 600;
 }
 
 /* Optional stricter state if ever applied via JS */
-.flatpickr-day.date-locked-other {
+.flatpickr-day.date-locked-other,
+.flatpickr-day.date-locked-other:hover {
     cursor: not-allowed !important;
     opacity: 0.7;
+    position: relative;
 }
 
 /* Fully booked (if future logic applies this class) */
@@ -667,15 +863,33 @@
     font-weight: 700;
 }
 
-.flatpickr-day.date-blocked:hover:not(.date-locked) {
+.flatpickr-day.selected,
+.flatpickr-day.selected:hover,
+.flatpickr-day.selected.date-blocked,
+.flatpickr-day.selected.date-locked,
+.flatpickr-day.selected.date-locked-full,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange,
+.admin-dates-calendar .flatpickr-day.selected,
+.admin-dates-calendar .flatpickr-day.selected:hover,
+.admin-dates-calendar .flatpickr-day.selected.flatpickr-disabled,
+.admin-dates-calendar .flatpickr-day.selected.date-blocked,
+.admin-dates-calendar .flatpickr-day.selected.date-locked,
+.admin-dates-calendar .flatpickr-day.selected.date-locked-full {
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    color: white !important;
+    opacity: 1 !important;
+    box-shadow: inset 0 0 0 1px var(--color-primary-dark);
+    font-weight: 600;
+}
+
+/* Fix: Ensure locked-other dates always show not-allowed, even if they match the date-blocked rule */
+.flatpickr-day.date-blocked:hover:not(.date-locked):not(.date-locked-other) {
     background: var(--color-border-light) !important;
     cursor: pointer !important;
 }
 
-.flatpickr-day.date-blocked.selected {
-    background-color: var(--color-primary) !important;
-    color: white !important;
-}
 
 /* ========================================
    Toast Notifications
