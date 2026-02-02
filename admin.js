@@ -18,7 +18,7 @@ import {
     orderBy,
     onSnapshot
 } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
-import { getSession, loginAdmin, logout, isAdmin } from './auth.js';
+import { getSession, loginAdmin, logout, isAdmin, createPharmacyAuthUser } from './auth.js';
 
 // ==========================================
 // Inlined Notifications (notify.js)
@@ -130,6 +130,58 @@ function showConfirm(message, options = {}) {
         const handleEsc = (e) => {
             if (e.key === 'Escape') {
                 closeDialog(false);
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+    });
+}
+
+function showPasswordPrompt(message, options = {}) {
+    const { title = 'Confirmar Senha' } = options;
+
+    return new Promise((resolve) => {
+        document.querySelector('.notify-dialog')?.remove();
+
+        const dialog = document.createElement('div');
+        dialog.className = 'notify-dialog';
+        dialog.innerHTML = `
+            <div class="notify-dialog__backdrop"></div>
+            <div class="notify-dialog__content">
+                ${title ? `<h3 class="notify-dialog__title">${title}</h3>` : ''}
+                <p class="notify-dialog__message">${message}</p>
+                <input type="password" class="notify-dialog__input" placeholder="Senha do Admin" autocomplete="current-password" />
+                <div class="notify-dialog__actions">
+                    <button class="notify-dialog__btn notify-dialog__btn--outline" data-action="cancel">Cancelar</button>
+                    <button class="notify-dialog__btn notify-dialog__btn--primary" data-action="confirm">Confirmar</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+        requestAnimationFrame(() => dialog.classList.add('visible'));
+
+        const input = dialog.querySelector('.notify-dialog__input');
+        input.focus();
+
+        const closeDialog = (password) => {
+            dialog.classList.remove('visible');
+            setTimeout(() => {
+                dialog.remove();
+                resolve(password);
+            }, 200);
+        };
+
+        dialog.querySelector('[data-action="confirm"]').addEventListener('click', () => closeDialog(input.value));
+        dialog.querySelector('[data-action="cancel"]').addEventListener('click', () => closeDialog(null));
+        dialog.querySelector('.notify-dialog__backdrop').addEventListener('click', () => closeDialog(null));
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') closeDialog(input.value);
+        });
+
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                closeDialog(null);
                 document.removeEventListener('keydown', handleEsc);
             }
         };
@@ -304,15 +356,17 @@ function initNavigation() {
 async function loadPharmacies() {
     try {
         const pharmaciesRef = collection(db, 'pharmacies');
-        const [pharmSnap, secretsSnap] = await Promise.all([
-            getDocs(pharmaciesRef),
-            getDocs(collection(db, 'pharmacy_secrets'))
-        ]);
+        const pharmSnap = await getDocs(pharmaciesRef);
 
         const secretsMap = {};
-        secretsSnap.docs.forEach(d => {
-            secretsMap[d.id] = d.data().pin;
-        });
+        try {
+            const secretsSnap = await getDocs(collection(db, 'pharmacy_secrets'));
+            secretsSnap.docs.forEach(d => {
+                secretsMap[d.id] = d.data().pin;
+            });
+        } catch (secretsError) {
+            console.warn('Unable to load pharmacy secrets:', secretsError);
+        }
 
         pharmacies = pharmSnap.docs.map(doc => ({
             id: doc.id,
@@ -560,6 +614,7 @@ async function savePharmacy() {
     const contact = document.getElementById('pharmacyContactInput').value.trim();
     const pin = document.getElementById('pharmacyPinInput').value.trim();
     const active = document.getElementById('pharmacyActiveInput').checked;
+    const isNewPharmacy = !pharmacyId;
 
     if (!name) {
         showToast('Nome é obrigatório', 'warning');
@@ -571,8 +626,38 @@ async function savePharmacy() {
         return;
     }
 
+    // For new pharmacies, we need to create Firebase Auth user
+    let adminPassword = null;
+    if (isNewPharmacy) {
+        adminPassword = await showPasswordPrompt(
+            'Para criar uma nova farmácia, confirme a sua senha de administrador:',
+            { title: 'Criar Farmácia' }
+        );
+        if (!adminPassword) {
+            showToast('Criação cancelada', 'info');
+            return;
+        }
+    }
+
     try {
         const docId = pharmacyId || `pharmacy_${Date.now()}`;
+        const session = getSession();
+
+        // For new pharmacies, create Firebase Auth user first
+        if (isNewPharmacy && session?.email) {
+            showLoading('A criar conta da farmácia...');
+            const authResult = await createPharmacyAuthUser(docId, pin, session.email, adminPassword);
+            hideLoading();
+
+            if (!authResult.success) {
+                if (authResult.error === 'auth/wrong-password') {
+                    showToast('Senha de administrador incorreta', 'error');
+                } else {
+                    showToast('Erro ao criar conta: ' + (authResult.error || 'desconhecido'), 'error');
+                }
+                return;
+            }
+        }
 
         // 1. Save Public Data (NO PIN)
         await setDoc(doc(db, 'pharmacies', docId), {
@@ -616,6 +701,7 @@ async function savePharmacy() {
         showToast('Farmácia guardada', 'success');
     } catch (error) {
         console.error('Error saving pharmacy:', error);
+        hideLoading();
         showToast('Erro ao guardar farmácia', 'error');
     }
 }

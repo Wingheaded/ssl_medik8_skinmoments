@@ -95,6 +95,34 @@ export async function logout() {
     }
 }
 
+/**
+ * Create Firebase Auth user for a new pharmacy (called from admin panel)
+ * This temporarily creates the pharmacy user then re-authenticates as admin
+ */
+export async function createPharmacyAuthUser(pharmacyId, pin, adminEmail, adminPassword) {
+    const email = `${pharmacyId}@medik8.local`;
+    const password = pin.length < 6 ? `${pin}00` : pin;
+
+    try {
+        // Create the pharmacy auth user
+        await createUserWithEmailAndPassword(auth, email, password);
+
+        // Re-authenticate as admin
+        await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+
+        return { success: true };
+    } catch (error) {
+        console.error('Error creating pharmacy auth user:', error);
+
+        // If user already exists, that's OK
+        if (error.code === 'auth/email-already-in-use') {
+            return { success: true, existed: true };
+        }
+
+        return { success: false, error: error.code };
+    }
+}
+
 // ==========================================
 // Pharmacy Authentication (Legacy/Custom)
 // ==========================================
