@@ -147,11 +147,43 @@ document.addEventListener('DOMContentLoaded', async () => {
 /**
  * Called after successful login - initializes the main app
  */
-function onLoginSuccess() {
+async function onLoginSuccess() {
     // Redirect to Admin Panel if admin
     if (isAdmin()) {
         window.location.href = './admin.html';
         return;
+    }
+
+    // For pharmacies, validate and set initial date
+    const today = state.date;
+    const monthKey = today.substring(0, 7);
+
+    // Fetch assigned dates for this month
+    await fetchAssignedDates(monthKey);
+    const assignedDates = assignedDatesCache[monthKey] || [];
+
+    // Check if today is assigned
+    if (!assignedDates.includes(today)) {
+        // Find first available assigned date (today or future)
+        const futureDates = assignedDates.filter(d => d >= today).sort();
+        if (futureDates.length > 0) {
+            state.date = futureDates[0];
+        } else if (assignedDates.length > 0) {
+            // No future dates, use last assigned date
+            state.date = assignedDates.sort().pop();
+        } else {
+            // No dates at all this month, check next month
+            const nextMonth = new Date(today);
+            nextMonth.setMonth(nextMonth.getMonth() + 1);
+            nextMonth.setDate(1);
+            const nextMonthKey = formatLocalDate(nextMonth).substring(0, 7);
+            await fetchAssignedDates(nextMonthKey);
+            const nextMonthDates = assignedDatesCache[nextMonthKey] || [];
+            if (nextMonthDates.length > 0) {
+                state.date = nextMonthDates.sort()[0];
+            }
+            // If still no dates, we'll show an empty state (handled later)
+        }
     }
 
     initEditableFields();
@@ -560,8 +592,18 @@ function updateHeaderStatus(isFull) {
     if (dateNav) dateNav.classList.toggle('header__date-nav--full', isFull);
 }
 
-async function changeDate(newDateStr) {
+async function changeDate(newDateStr, skipValidation = false) {
     if (state.date === newDateStr) return;
+
+    // Pharmacy date validation (skip for admin or explicit override)
+    if (!skipValidation && !isAdmin()) {
+        const { allowed } = await checkDateAssignment(newDateStr);
+        if (!allowed) {
+            showAlert(t('dateNotAssigned'), t('appName'));
+            return;
+        }
+    }
+
     state.date = newDateStr;
     updateDateDisplay();
     await loadScheduleFromFirebase();
