@@ -165,7 +165,16 @@ export function initAuth(callback) {
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             const session = getSession();
-            // Sync local session with Firebase User if mismatch or missing
+
+            // If we have a valid pharmacy session, preserve it - don't overwrite with admin
+            // Pharmacy sessions have pharmacyId and isAdmin: false
+            if (session && session.pharmacyId && session.isAdmin === false) {
+                // Pharmacy session is valid, don't overwrite
+                if (callback) callback(user);
+                return;
+            }
+
+            // Sync local session with Firebase User if mismatch or missing (admin only)
             if (!session || session.uid !== user.uid) {
                 const userDoc = await getDoc(doc(db, 'users', user.uid));
                 const userData = userDoc.exists() ? userDoc.data() : {};
@@ -235,9 +244,11 @@ export async function getAssignedDates(monthKey) {
         }
 
         const snapshot = await getDocs(q);
-        return snapshot.docs
+
+        const result = snapshot.docs
             .map(doc => doc.data().date)
             .filter(date => date.startsWith(monthKey));
+        return result;
     } catch (error) {
         console.error('Error fetching assigned dates:', error);
         return [];
