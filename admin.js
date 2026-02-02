@@ -770,6 +770,7 @@ function initDateAssignmentCalendar() {
     if (!container) return;
 
     dateAssignmentCalendar = flatpickr(container, {
+        locale: 'pt',
         inline: true,
         mode: 'multiple',
         dateFormat: 'Y-m-d',

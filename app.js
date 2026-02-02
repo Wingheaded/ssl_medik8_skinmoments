@@ -628,6 +628,7 @@ function initFlatpickr() {
     datePickerEl.style.cssText = 'position:absolute;opacity:0;pointer-events:none;';
 
     flatpickrInstance = flatpickr(datePickerEl, {
+        locale: 'pt',
         dateFormat: 'Y-m-d',
         defaultDate: state.date,
         positionElement: elements.dateDisplay,
