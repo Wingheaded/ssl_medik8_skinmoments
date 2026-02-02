@@ -268,14 +268,16 @@ export async function getAssignedDates(monthKey) {
         if (session.isAdmin) {
             q = query(assignmentsRef, where('date', '>=', startDate), where('date', '<=', endDate));
         } else {
+            // Query by pharmacyId only (no composite index needed)
             q = query(assignmentsRef, where('pharmacyId', '==', session.pharmacyId));
         }
 
         const snapshot = await getDocs(q);
 
+        // Filter by month in JavaScript (works for both admin and pharmacy)
         const result = snapshot.docs
             .map(doc => doc.data().date)
-            .filter(date => date.startsWith(monthKey));
+            .filter(date => date && date.startsWith(monthKey));
         return result;
     } catch (error) {
         console.error('Error fetching assigned dates:', error);
