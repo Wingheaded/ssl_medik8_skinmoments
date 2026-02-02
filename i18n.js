@@ -8,12 +8,13 @@ let currentStrings = {};
 let currentLanguage = 'pt';
 
 /**
- * Detect browser language preference
+ * Detect browser language preference (defaults to Portuguese for this PT app)
  * @returns {'pt'|'en'} Detected language code
  */
 function detectBrowserLanguage() {
     const browserLang = navigator.language || navigator.userLanguage;
-    return browserLang.startsWith('pt') ? 'pt' : 'en';
+    // Default to Portuguese unless explicitly English
+    return browserLang.startsWith('en') ? 'en' : 'pt';
 }
 
 /**
