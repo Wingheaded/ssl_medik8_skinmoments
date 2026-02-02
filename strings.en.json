@@ -101,6 +101,6 @@
     "networkError": "Network error",
     "unknownError": "Unknown error",
     "noPharmaciesAvailable": "No pharmacies available",
-    "dateNotAssigned": "This date is not assigned to your pharmacy",
+    "dateNotAssigned": "These dates are not available for your pharmacy",
     "slotNotAvailable": "This time slot is already booked"
 }

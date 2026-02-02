@@ -36,6 +36,7 @@ import { db } from './firebase-config.js';
 import { doc, getDoc, setDoc, updateDoc, deleteField, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 import { initLogin } from './login.js';
 import { getSession, isAdmin, getPharmacy, checkDateAssignment, getAssignedDates } from './auth.js';
+import { showAlert } from './notify.js';
 
 // ==========================================
 // Date Utilities
@@ -627,7 +628,9 @@ function initFlatpickr() {
                 const { allowed, reason } = await checkDateAssignment(dateStr);
                 if (!allowed) {
                     // Show error toast and revert
-                    alert(t(reason === 'date_not_assigned' ? 'dateNotAssigned' : 'unknownError'));
+                    // alert(t(reason === 'date_not_assigned' ? 'dateNotAssigned' : 'unknownError'));
+                    const msgKey = (reason === 'dateNotAssigned' || reason === 'dateAssignedToOther') ? 'dateNotAssigned' : 'unknownError';
+                    showAlert(t(msgKey), t('appName'));
                     return;
                 }
             }

@@ -102,6 +102,6 @@
     "networkError": "Erro de rede",
     "unknownError": "Erro desconhecido",
     "noPharmaciesAvailable": "Nenhuma farmácia disponível",
-    "dateNotAssigned": "Esta data não está atribuída à sua farmácia",
+    "dateNotAssigned": "Estas datas não estão disponíveis para a sua farmácia",
     "slotNotAvailable": "Este horário já está reservado"
 }
