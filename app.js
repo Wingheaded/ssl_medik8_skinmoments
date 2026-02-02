@@ -660,6 +660,9 @@ function initFlatpickr() {
                     dayElem.classList.add('date-assigned');
                 } else {
                     dayElem.classList.add('date-not-assigned');
+                    // Add tooltip and forbidden cursor like admin panel
+                    dayElem.setAttribute('title', t('dateNotAssigned'));
+                    dayElem.style.cursor = 'not-allowed';
                 }
             }
         },
@@ -668,12 +671,9 @@ function initFlatpickr() {
 
             // Check if pharmacy user can access this date
             if (!isAdmin()) {
-                const { allowed, reason } = await checkDateAssignment(dateStr);
+                const { allowed } = await checkDateAssignment(dateStr);
                 if (!allowed) {
-                    // Show error toast and revert
-                    // alert(t(reason === 'date_not_assigned' ? 'dateNotAssigned' : 'unknownError'));
-                    const msgKey = (reason === 'dateNotAssigned' || reason === 'dateAssignedToOther') ? 'dateNotAssigned' : 'unknownError';
-                    showAlert(t(msgKey), t('appName'));
+                    // Silently block - visual cues (tooltip, cursor) already communicate the lock
                     return;
                 }
             }
