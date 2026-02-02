@@ -508,6 +508,9 @@ function renderPharmaciesTable(listToRender = pharmacies, searchQuery = '') {
                 </td>
                 <td>
                     <div class="admin-actions">
+                        <button class="admin-action-btn" onclick="syncPharmacyAuth('${pharmacy.id}', '${pharmacy.pin}', '${pharmacy.name.replace(/'/g, "\\'")}')" title="Reparar Login">
+                            <span class="material-symbols-outlined">sync_lock</span>
+                        </button>
                         <button class="admin-action-btn" onclick="editPharmacy('${pharmacy.id}')" title="Editar">
                             <span class="material-symbols-outlined">edit</span>
                         </button>
@@ -707,6 +710,37 @@ async function savePharmacy() {
 }
 
 window.editPharmacy = openPharmacyModal;
+
+window.syncPharmacyAuth = async function (pharmacyId, pin, name) {
+    const adminPassword = await showPasswordPrompt(
+        `Para reparar o login da ${name}, confirme a senha de admin:`,
+        { title: 'Reparar Login' }
+    );
+    if (!adminPassword) return;
+
+    showLoading('A reparar login...');
+    const session = getSession();
+    try {
+        const result = await createPharmacyAuthUser(pharmacyId, pin, session?.email, adminPassword);
+
+        hideLoading();
+
+        if (result.success) {
+            showToast('Login reparado com sucesso!', 'success');
+        } else {
+            console.error('Sync auth failed:', result);
+            if (result.error === 'auth/wrong-password') {
+                showToast('Senha de admin incorreta', 'error');
+            } else {
+                showToast('Erro ao reparar: ' + result.error, 'error');
+            }
+        }
+    } catch (e) {
+        hideLoading();
+        console.error(e);
+        showToast('Erro inesperado', 'error');
+    }
+};
 
 window.deletePharmacy = async function (pharmacyId) {
     const confirm = await showConfirm(
