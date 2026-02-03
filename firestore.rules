@@ -39,8 +39,14 @@ service cloud.firestore {
       // Users can read their own profile
       allow read: if isAdmin() || request.auth.uid == userId;
       
-      // Admin only write
+      // Admin can write all users
       allow write: if isAdmin();
+      
+      // NEW: Allow user to create their own profile if email is in invites
+      // This enables invite-based signup flow
+      allow create: if isAuthenticated() 
+                    && request.auth.uid == userId 
+                    && exists(/databases/$(database)/documents/invites/$(request.auth.token.email));
     }
 
     match /invites/{email} {
