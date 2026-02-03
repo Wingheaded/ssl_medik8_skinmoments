@@ -16,7 +16,8 @@ import {
     query,
     where,
     orderBy,
-    onSnapshot
+    onSnapshot,
+    addDoc
 } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 import { getSession, loginAdmin, logout, isAdmin, createPharmacyAuthUser } from './auth.js';
 
@@ -1492,7 +1493,16 @@ function renderAdminsTable() {
             <td><span class="admin-table-name">${i.name}</span> <small>(Convite)</small></td>
             <td>${i.email}</td>
             <td><span class="admin-badge admin-badge--info">Pendente</span></td>
-            <td><div class="admin-actions"><button class="admin-action-btn admin-action-btn--danger" onclick="deleteAdminUser('${i.id}', 'invite')"><span class="material-symbols-outlined">close</span></button></div></td>
+            <td>
+                <div class="admin-actions">
+                    <button class="admin-action-btn admin-action-btn--info" onclick="resendInvite('${i.email}', '${i.name}')" title="Reenviar Email">
+                        <span class="material-symbols-outlined">send</span>
+                    </button>
+                    <button class="admin-action-btn admin-action-btn--danger" onclick="deleteAdminUser('${i.id}', 'invite')" title="Remover">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            </td>
         </tr>
     `).join('');
 
@@ -1519,14 +1529,54 @@ async function saveAdminUser() {
     showLoading('A criar convite...');
     try {
         const session = getSession();
-        await setDoc(doc(db, 'invites', email), { name, email, role: 'admin', invitedBy: session.uid || 'admin', createdAt: new Date().toISOString() });
+        // 1. Create the invite document
+        await setDoc(doc(db, 'invites', email), {
+            name,
+            email,
+            role: 'admin',
+            invitedBy: session.uid || 'admin',
+            createdAt: new Date().toISOString()
+        });
+
+        // 2. Trigger the email extension
+        await sendInviteEmail(email, name);
+
         closeAdminUserModal();
         await loadAdmins();
-        showToast('Convite enviado', 'success');
+        showToast('Convite enviado por email', 'success');
     } catch (e) {
-        showToast('Erro ao criar convite', 'error');
+        console.error("Invite error:", e);
+        showToast('Erro ao criar convite: ' + e.message, 'error');
     } finally {
         hideLoading();
+    }
+}
+
+async function sendInviteEmail(email, name) {
+    const appUrl = window.location.origin; // Current URL
+
+    try {
+        await addDoc(collection(db, 'mail'), {
+            to: email,
+            message: {
+                subject: 'Convite: Admin - Medik8 Skin Moments',
+                html: `
+                    <div style="font-family: sans-serif; padding: 20px; color: #333;">
+                        <h2 style="color: #7B9E89;">Olá ${name},</h2>
+                        <p>Você foi convidado para ser Administrador no <strong>Medik8 Skin Moments Scheduler</strong>.</p>
+                        <p>Para acessar, clique no link abaixo e selecione "Criar Conta / Aceitar Convite":</p>
+                        <p style="margin: 20px 0;">
+                            <a href="${appUrl}" style="background-color: #7B9E89; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Acessar Painel</a>
+                        </p>
+                        <p style="font-size: 12px; color: #666;">Se o botão não funcionar: ${appUrl}</p>
+                    </div>
+                `
+            }
+        });
+        console.log("Email document created in 'mail' collection");
+    } catch (error) {
+        console.error("Error queueing email:", error);
+        throw new Error("Falha ao enviar email (mas o convite foi criado)");
     }
 }
 
