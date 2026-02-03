@@ -3,7 +3,7 @@
  * Pharmacy management, date assignment, and reservation overview
  */
 
-import { db } from './firebase-config.js';
+import { db, functions, httpsCallable } from './firebase-config.js';
 import { reflow } from './scheduler.js';
 import {
     collection,
@@ -1553,32 +1553,44 @@ async function saveAdminUser() {
 }
 
 async function sendInviteEmail(email, name) {
-    const appUrl = window.location.origin; // Current URL
+    const appUrl = window.location.origin;
 
     try {
-        await addDoc(collection(db, 'mail'), {
+        const sendEmail = httpsCallable(functions, 'sendEmail');
+        await sendEmail({
             to: email,
-            message: {
-                subject: 'Convite: Admin - Medik8 Skin Moments',
-                html: `
-                    <div style="font-family: sans-serif; padding: 20px; color: #333;">
-                        <h2 style="color: #7B9E89;">Olá ${name},</h2>
-                        <p>Você foi convidado para ser Administrador no <strong>Medik8 Skin Moments Scheduler</strong>.</p>
-                        <p>Para acessar, clique no link abaixo e selecione "Criar Conta / Aceitar Convite":</p>
-                        <p style="margin: 20px 0;">
-                            <a href="${appUrl}" style="background-color: #7B9E89; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Acessar Painel</a>
-                        </p>
-                        <p style="font-size: 12px; color: #666;">Se o botão não funcionar: ${appUrl}</p>
-                    </div>
-                `
-            }
+            subject: 'Convite: Admin - Medik8 Skin Moments',
+            html: `
+                <div style="font-family: sans-serif; padding: 20px; color: #333;">
+                    <h2 style="color: #7B9E89;">Olá ${name},</h2>
+                    <p>Você foi convidado para ser Administrador no <strong>Medik8 Skin Moments Scheduler</strong>.</p>
+                    <p>Para acessar, clique no link abaixo e selecione "Criar Conta / Aceitar Convite":</p>
+                    <p style="margin: 20px 0;">
+                        <a href="${appUrl}" style="background-color: #7B9E89; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Acessar Painel</a>
+                    </p>
+                    <p style="font-size: 12px; color: #666;">Se o botão não funcionar: ${appUrl}</p>
+                </div>
+            `
         });
-        console.log("Email document created in 'mail' collection");
+        console.log("Invite email sent via Cloud Function");
     } catch (error) {
-        console.error("Error queueing email:", error);
+        console.error("Error sending email:", error);
         throw new Error("Falha ao enviar email (mas o convite foi criado)");
     }
 }
+
+window.resendInvite = async function (email, name) {
+    showLoading('A reenviar email...');
+    try {
+        await sendInviteEmail(email, name);
+        showToast('Email reenviado com sucesso!', 'success');
+    } catch (e) {
+        console.error('Resend error:', e);
+        showToast('Erro ao reenviar: ' + e.message, 'error');
+    } finally {
+        hideLoading();
+    }
+};
 
 window.deleteAdminUser = async function (id, type) {
     const confirm = await showConfirm('Remover este acesso?', { confirmStyle: 'danger' });
