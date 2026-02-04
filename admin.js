@@ -1484,7 +1484,7 @@ function renderAdminsTable() {
             <td><span class="admin-table-name">${u.name || 'Sem nome'}</span></td>
             <td>${u.email}</td>
             <td><span class="admin-badge ${u.role === 'owner' ? 'admin-badge--purple' : 'admin-badge--success'}">${u.role === 'owner' ? 'Owner' : 'Ativo'}</span></td>
-            <td><div class="admin-actions">${u.role !== 'owner' ? `<button class="admin-action-btn admin-action-btn--danger" onclick="deleteAdminUser('${u.id}', 'user')"><span class="material-symbols-outlined">person_remove</span></button>` : ''}</div></td>
+            <td><div class="admin-actions">${u.role !== 'owner' ? `<button class="admin-action-btn admin-action-btn--danger" onclick="deleteAdminUser('${u.id}', 'user', '${u.email}')"><span class="material-symbols-outlined">person_remove</span></button>` : ''}</div></td>
         </tr>
     `).join('');
 
@@ -1498,7 +1498,7 @@ function renderAdminsTable() {
                     <button class="admin-action-btn admin-action-btn--info" onclick="resendInvite('${i.email}', '${i.name}')" title="Reenviar Email">
                         <span class="material-symbols-outlined">send</span>
                     </button>
-                    <button class="admin-action-btn admin-action-btn--danger" onclick="deleteAdminUser('${i.id}', 'invite')" title="Remover">
+                    <button class="admin-action-btn admin-action-btn--danger" onclick="deleteAdminUser('${i.id}', 'invite', '${i.email}')" title="Remover">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
@@ -1592,15 +1592,172 @@ window.resendInvite = async function (email, name) {
     }
 };
 
-window.deleteAdminUser = async function (id, type) {
-    const confirm = await showConfirm('Remover este acesso?', { confirmStyle: 'danger' });
-    if (!confirm) return;
+/**
+ * Delete admin user with MAXIMUM protection
+ * - Requires typing "CONFIRMAR" to proceed
+ * - Hardcoded owner email protection
+ * - Pre-validates the user before deletion
+ */
+window.deleteAdminUser = async function (id, type, email) {
+    const OWNER_EMAIL = 'jose.antonio@skinselflove.com.pt';
+
+    // ═══════════════════════════════════════════════════════════
+    // CRITICAL PROTECTION 1: Hardcoded owner email check
+    // ═══════════════════════════════════════════════════════════
+    if (!email) {
+        showToast('Erro: Email não fornecido', 'error');
+        return;
+    }
+
+    if (email.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
+        showToast('BLOQUEADO: Impossível remover a conta do proprietário!', 'error');
+        console.error('BLOCKED: Attempt to delete owner account:', email);
+        return;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // CRITICAL PROTECTION 2: ID validation
+    // ═══════════════════════════════════════════════════════════
+    if (!id || typeof id !== 'string' || id.length < 5) {
+        showToast('Erro: ID inválido', 'error');
+        console.error('Invalid ID provided:', id);
+        return;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // TYPE CONFIRMATION: User must type "CONFIRMAR"
+    // ═══════════════════════════════════════════════════════════
+    const confirmText = await showTypeConfirm(
+        `Para remover <strong>${email}</strong>, escreva CONFIRMAR:`,
+        'CONFIRMAR',
+        { title: 'Confirmar Remoção', confirmStyle: 'danger' }
+    );
+
+    if (!confirmText) {
+        return;
+    }
+
+    showLoading('A remover utilizador...');
+
+    // ═══════════════════════════════════════════════════════════
+    // PRE-VALIDATION: Double check user exists and is not owner
+    // ═══════════════════════════════════════════════════════════
+    if (type === 'user') {
+        try {
+            const userDoc = await getDoc(doc(db, 'users', id));
+            if (userDoc.exists()) {
+                const userData = userDoc.data();
+                // Triple check: role and email
+                if (userData.role === 'owner' || userData.email?.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
+                    hideLoading();
+                    showToast('BLOQUEADO: Esta é a conta do proprietário!', 'error');
+                    console.error('BLOCKED at validation: Owner account', userData);
+                    return;
+                }
+                console.log('Pre-validation OK:', { id, email: userData.email, role: userData.role });
+            }
+        } catch (e) {
+            console.warn('Pre-validation check failed:', e);
+        }
+    }
+
     try {
-        if (type === 'user') await deleteDoc(doc(db, 'users', id));
-        else await deleteDoc(doc(db, 'invites', id));
+        // ═══════════════════════════════════════════════════════════
+        // DELETE FROM FIREBASE AUTH (for users only)
+        // ═══════════════════════════════════════════════════════════
+        if (type === 'user') {
+            try {
+                const deleteAdminUserFn = httpsCallable(functions, 'deleteAdminUser');
+                const result = await deleteAdminUserFn({ uid: id });
+                console.log('Auth deletion result:', result.data);
+            } catch (authError) {
+                console.error('Auth deletion error:', authError);
+                if (authError.code === 'functions/permission-denied') {
+                    hideLoading();
+                    showToast('Não tem permissão para remover este utilizador', 'error');
+                    return;
+                }
+                // For other errors (user not found in Auth), continue with Firestore deletion
+            }
+
+            // Delete from Firestore
+            console.log('Deleting from Firestore /users:', id);
+            await deleteDoc(doc(db, 'users', id));
+
+        } else {
+            // For invites, just delete from Firestore
+            console.log('Deleting from Firestore /invites:', id);
+            await deleteDoc(doc(db, 'invites', id));
+        }
+
         await loadAdmins();
+        hideLoading();
         showToast('Removido com sucesso', 'success');
+
     } catch (e) {
-        showToast('Erro ao remover', 'error');
+        console.error('Error deleting admin user:', e);
+        hideLoading();
+        showToast('Erro ao remover: ' + e.message, 'error');
     }
 };
+
+/**
+ * Type confirmation dialog - User must type exact text to confirm
+ */
+function showTypeConfirm(message, requiredText, options = {}) {
+    const {
+        title = 'Confirmar',
+        confirmText = 'Confirmar',
+        cancelText = 'Cancelar',
+        confirmStyle = 'primary'
+    } = options;
+
+    return new Promise((resolve) => {
+        document.querySelector('.notify-dialog')?.remove();
+
+        const dialog = document.createElement('div');
+        dialog.className = 'notify-dialog';
+        dialog.innerHTML = `
+            <div class="notify-dialog__backdrop"></div>
+            <div class="notify-dialog__content">
+                ${title ? `<h3 class="notify-dialog__title">${title}</h3>` : ''}
+                <p class="notify-dialog__message">${message}</p>
+                <input type="text" class="notify-dialog__input" placeholder="Escreva ${requiredText}" autocomplete="off" style="text-transform: uppercase;" />
+                <div class="notify-dialog__actions">
+                    <button class="notify-dialog__btn notify-dialog__btn--outline" data-action="cancel">${cancelText}</button>
+                    <button class="notify-dialog__btn notify-dialog__btn--${confirmStyle}" data-action="confirm" disabled>${confirmText}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+        requestAnimationFrame(() => dialog.classList.add('visible'));
+
+        const input = dialog.querySelector('.notify-dialog__input');
+        const confirmBtn = dialog.querySelector('[data-action="confirm"]');
+        input.focus();
+
+        // Enable confirm only when text matches
+        input.addEventListener('input', () => {
+            const matches = input.value.toUpperCase().trim() === requiredText.toUpperCase();
+            confirmBtn.disabled = !matches;
+        });
+
+        const closeDialog = (result) => {
+            dialog.classList.remove('visible');
+            setTimeout(() => {
+                dialog.remove();
+                resolve(result);
+            }, 200);
+        };
+
+        confirmBtn.addEventListener('click', () => closeDialog(true));
+        dialog.querySelector('[data-action="cancel"]').addEventListener('click', () => closeDialog(false));
+        dialog.querySelector('.notify-dialog__backdrop').addEventListener('click', () => closeDialog(false));
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !confirmBtn.disabled) closeDialog(true);
+            if (e.key === 'Escape') closeDialog(false);
+        });
+    });
+}
