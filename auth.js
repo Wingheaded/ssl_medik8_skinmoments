@@ -68,6 +68,15 @@ export async function signUpAdmin(name, email, password) {
             createdAt: new Date().toISOString()
         });
 
+        // Delete the invite document now that signup is complete
+        try {
+            const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js");
+            await deleteDoc(doc(db, 'invites', email));
+            console.log('Invite deleted for:', email);
+        } catch (inviteErr) {
+            console.warn('Could not delete invite (may not exist):', inviteErr);
+        }
+
         const session = {
             isAdmin: true,
             uid: user.uid,

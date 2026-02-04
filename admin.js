@@ -1457,7 +1457,11 @@ async function loadAdmins() {
 
         const invitesRef = collection(db, 'invites');
         const snapInvites = await getDocs(invitesRef);
-        pendingInvites = snapInvites.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const allInvites = snapInvites.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Filter out invites where the email is already an active admin user
+        const adminEmails = new Set(adminUsers.map(u => u.email?.toLowerCase()));
+        pendingInvites = allInvites.filter(invite => !adminEmails.has(invite.email?.toLowerCase()));
 
         renderAdminsTable();
     } catch (error) {
