@@ -72,6 +72,7 @@ let isSaving = false; // Lock flag to prevent onSnapshot from overwriting during
 let availabilityCache = {};
 let assignedDatesCache = {}; // Cache for assigned dates per month
 state.ui.dateAccess = { allowed: true };
+state.ui.hasFutureAssignedDates = true;
 
 // ==========================================
 // DOM Elements
@@ -188,12 +189,23 @@ async function onLoginSuccess() {
 }
 
 function isCurrentDateAccessible() {
-    return state.ui.dateAccess?.allowed !== false;
+    return state.ui.dateAccess?.allowed !== false && state.ui.hasFutureAssignedDates !== false;
 }
 
 async function refreshDateAccess(dateStr = state.date) {
     if (isAdmin()) {
         state.ui.dateAccess = { allowed: true };
+        state.ui.hasFutureAssignedDates = true;
+        return state.ui.dateAccess;
+    }
+
+    const today = formatLocalDate(new Date());
+    const allAssignedDates = await getAllAssignedDates();
+    const futureAssignedDates = allAssignedDates.filter(date => date >= today);
+    state.ui.hasFutureAssignedDates = futureAssignedDates.length > 0;
+
+    if (futureAssignedDates.length === 0) {
+        state.ui.dateAccess = { allowed: false, reason: 'noFutureAssignedDates' };
         return state.ui.dateAccess;
     }
 

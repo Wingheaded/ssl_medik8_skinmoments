@@ -373,6 +373,7 @@ async function loadPharmacies() {
         pharmacies = pharmSnap.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
+            manualActive: doc.data().manualActive ?? doc.data().active ?? true,
             pin: secretsMap[doc.id] || '' // Merge secure PIN
         }));
 
@@ -544,7 +545,7 @@ function filterAndRenderPharmacies() {
 }
 
 function populatePharmacyDropdowns() {
-    const assignablePharmacies = pharmacies.filter(p => p.active);
+    const assignablePharmacies = pharmacies.filter(p => p.manualActive !== false);
     const filterablePharmacies = pharmacies;
 
     const assignSelect = document.getElementById('assignPharmacySelect');
@@ -573,8 +574,9 @@ function applyPharmacyAvailabilityState() {
     const futureAssignedPharmacyIds = new Set();
 
     if (dateAssignmentsLoaded) {
-        Object.values(dateAssignments).forEach(assignment => {
-            if (assignment?.pharmacyId && assignment.date >= today) {
+        Object.entries(dateAssignments).forEach(([dateKey, assignment]) => {
+            const assignmentDate = assignment?.date || dateKey;
+            if (assignment?.pharmacyId && assignmentDate >= today) {
                 futureAssignedPharmacyIds.add(assignment.pharmacyId);
             }
         });
@@ -582,16 +584,49 @@ function applyPharmacyAvailabilityState() {
 
     pharmacies = pharmacies.map(pharmacy => {
         const hasFutureAssignments = futureAssignedPharmacyIds.has(pharmacy.id);
+        const manualActive = pharmacy.manualActive !== false;
+        const effectiveActive = dateAssignmentsLoaded
+            ? manualActive && hasFutureAssignments
+            : manualActive;
+
         return {
             ...pharmacy,
+            manualActive,
             hasFutureAssignments,
-            effectiveActive: dateAssignmentsLoaded
-                ? Boolean(pharmacy.active) && hasFutureAssignments
-                : Boolean(pharmacy.active)
+            effectiveActive
         };
     });
 
     pharmaciesById = buildPharmacyMap(pharmacies);
+}
+
+async function syncPharmacyOperationalStatus() {
+    if (!dateAssignmentsLoaded || pharmacies.length === 0) return;
+
+    const updates = [];
+
+    pharmacies.forEach(pharmacy => {
+        if (Boolean(pharmacy.active) !== Boolean(pharmacy.effectiveActive)) {
+            updates.push(setDoc(doc(db, 'pharmacies', pharmacy.id), {
+                active: pharmacy.effectiveActive,
+                manualActive: pharmacy.manualActive,
+                updatedAt: new Date().toISOString()
+            }, { merge: true }));
+        }
+    });
+
+    if (updates.length > 0) {
+        try {
+            await Promise.all(updates);
+            pharmacies = pharmacies.map(pharmacy => ({
+                ...pharmacy,
+                active: pharmacy.effectiveActive
+            }));
+            pharmaciesById = buildPharmacyMap(pharmacies);
+        } catch (error) {
+            console.error('Error syncing pharmacy operational status:', error);
+        }
+    }
 }
 
 // ==========================================
@@ -621,7 +656,7 @@ function openPharmacyModal(pharmacyId = null) {
             document.getElementById('pharmacyNameInput').value = pharmacy.name;
             document.getElementById('pharmacyContactInput').value = pharmacy.contact || '';
             document.getElementById('pharmacyPinInput').value = pharmacy.pin;
-            document.getElementById('pharmacyActiveInput').checked = pharmacy.active;
+            document.getElementById('pharmacyActiveInput').checked = pharmacy.manualActive !== false;
         }
     } else {
         if (title) title.textContent = 'Nova Farmácia';
@@ -644,7 +679,7 @@ async function savePharmacy() {
     const name = document.getElementById('pharmacyNameInput').value.trim();
     const contact = document.getElementById('pharmacyContactInput').value.trim();
     const pin = document.getElementById('pharmacyPinInput').value.trim();
-    const active = document.getElementById('pharmacyActiveInput').checked;
+    const manualActive = document.getElementById('pharmacyActiveInput').checked;
     const isNewPharmacy = !pharmacyId;
 
     if (!name) {
@@ -694,7 +729,8 @@ async function savePharmacy() {
         await setDoc(doc(db, 'pharmacies', docId), {
             name,
             contact,
-            active,
+            active: manualActive,
+            manualActive,
             updatedAt: new Date().toISOString()
         }, { merge: true });
 
@@ -974,6 +1010,7 @@ async function loadDateAssignments() {
 
         await reconcileAssignmentNames();
         applyPharmacyAvailabilityState();
+        await syncPharmacyOperationalStatus();
         filterAndRenderPharmacies();
         populatePharmacyDropdowns();
         renderAssignedDatesGrid();
