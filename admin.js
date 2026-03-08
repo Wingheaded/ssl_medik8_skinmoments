@@ -575,7 +575,7 @@ function applyPharmacyAvailabilityState() {
 
     if (dateAssignmentsLoaded) {
         Object.entries(dateAssignments).forEach(([dateKey, assignment]) => {
-            const assignmentDate = assignment?.date || dateKey;
+            const assignmentDate = normalizeDateKey(assignment?.date || dateKey);
             if (assignment?.pharmacyId && assignmentDate >= today) {
                 futureAssignedPharmacyIds.add(assignment.pharmacyId);
             }
@@ -931,6 +931,21 @@ function formatLocalDate(date) {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+}
+
+function normalizeDateKey(dateValue) {
+    if (!dateValue) return null;
+    if (dateValue instanceof Date) return formatLocalDate(dateValue);
+
+    const raw = String(dateValue).trim().replace(/\//g, '-');
+    const match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (match) {
+        const [, year, month, day] = match;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : formatLocalDate(parsed);
 }
 
 function updateSelectedDatesList() {

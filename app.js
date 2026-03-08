@@ -53,6 +53,21 @@ function formatLocalDate(date) {
     return `${year}-${month}-${day}`;
 }
 
+function normalizeDateKey(dateValue) {
+    if (!dateValue) return null;
+    if (dateValue instanceof Date) return formatLocalDate(dateValue);
+
+    const raw = String(dateValue).trim().replace(/\//g, '-');
+    const match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (match) {
+        const [, year, month, day] = match;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    const parsed = new Date(raw);
+    return Number.isNaN(parsed.getTime()) ? null : formatLocalDate(parsed);
+}
+
 // ==========================================
 // State Management
 // ==========================================
@@ -162,7 +177,10 @@ async function onLoginSuccess() {
     const monthKey = today.substring(0, 7);
     await fetchAssignedDates(monthKey);
 
-    const allAssignedDates = await getAllAssignedDates();
+    const allAssignedDates = (await getAllAssignedDates())
+        .map(normalizeDateKey)
+        .filter(Boolean)
+        .sort();
     const futureAssignedDates = allAssignedDates.filter(date => date >= today);
     if (futureAssignedDates.length > 0 && !futureAssignedDates.includes(today)) {
         state.date = futureAssignedDates[0];
@@ -200,7 +218,10 @@ async function refreshDateAccess(dateStr = state.date) {
     }
 
     const today = formatLocalDate(new Date());
-    const allAssignedDates = await getAllAssignedDates();
+    const allAssignedDates = (await getAllAssignedDates())
+        .map(normalizeDateKey)
+        .filter(Boolean)
+        .sort();
     const futureAssignedDates = allAssignedDates.filter(date => date >= today);
     state.ui.hasFutureAssignedDates = futureAssignedDates.length > 0;
 
