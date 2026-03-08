@@ -569,6 +569,26 @@
     border-radius: var(--radius-sm);
 }
 
+.assigned-date-tag--past {
+    background-color: rgba(196, 91, 91, 0.12);
+    border-color: rgba(196, 91, 91, 0.35);
+    color: #9e2f2f;
+}
+
+.assigned-date-tag--active {
+    background-color: rgba(123, 158, 137, 0.16);
+    border-color: rgba(123, 158, 137, 0.38);
+    color: #3d6c4a;
+}
+
+.assigned-date-tag--past .remove-date-btn {
+    color: #9e2f2f;
+}
+
+.assigned-date-tag--active .remove-date-btn {
+    color: #3d6c4a;
+}
+
 .remove-date-btn {
     display: flex;
     align-items: center;

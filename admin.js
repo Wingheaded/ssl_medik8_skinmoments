@@ -1056,6 +1056,7 @@ function renderAssignedDatesGrid() {
     const grid = document.getElementById('assignedDatesGrid');
     const empty = document.getElementById('assignedDatesEmpty');
     const entries = Object.entries(dateAssignments);
+    const today = formatLocalDate(new Date());
 
     if (!grid) return;
 
@@ -1072,7 +1073,7 @@ function renderAssignedDatesGrid() {
         if (!byPharmacy[data.pharmacyId]) {
             byPharmacy[data.pharmacyId] = { name: data.pharmacyName, dates: [] };
         }
-        byPharmacy[data.pharmacyId].dates.push(date);
+        byPharmacy[data.pharmacyId].dates.push(normalizeDateKey(data.date || date) || date);
     });
 
     grid.innerHTML = Object.entries(byPharmacy).map(([id, data]) => `
@@ -1080,7 +1081,7 @@ function renderAssignedDatesGrid() {
             <h4>${data.name}</h4>
             <div class="assigned-dates-list">
                 ${data.dates.sort().map(d => `
-                    <span class="assigned-date-tag">
+                    <span class="assigned-date-tag ${d < today ? 'assigned-date-tag--past' : 'assigned-date-tag--active'}">
                         ${d}
                         <button class="remove-date-btn" onclick="removeAssignment('${d}')" title="Remover">×</button>
                     </span>
