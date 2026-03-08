@@ -35,7 +35,7 @@ import { initDrag, makeDraggable, cancelDrag } from './drag.js';
 import { db } from './firebase-config.js';
 import { doc, getDoc, setDoc, updateDoc, deleteField, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
 import { initLogin } from './login.js';
-import { getSession, isAdmin, getPharmacy, checkDateAssignment, getAssignedDates } from './auth.js';
+import { getSession, isAdmin, getPharmacy, checkDateAssignment, getAssignedDates, getAllAssignedDates } from './auth.js';
 import { showAlert } from './notify.js';
 
 // ==========================================
@@ -71,6 +71,7 @@ let flatpickrInstance = null;
 let isSaving = false; // Lock flag to prevent onSnapshot from overwriting during save
 let availabilityCache = {};
 let assignedDatesCache = {}; // Cache for assigned dates per month
+state.ui.dateAccess = { allowed: true };
 
 // ==========================================
 // DOM Elements
@@ -154,36 +155,17 @@ async function onLoginSuccess() {
         return;
     }
 
-    // For pharmacies, validate and set initial date
+    // For pharmacies, keep today unless there is a future assigned date to jump to.
+    // Past assignments should not become the active working day again.
     const today = state.date;
     const monthKey = today.substring(0, 7);
-
-    // Fetch assigned dates for this month
     await fetchAssignedDates(monthKey);
-    const assignedDates = assignedDatesCache[monthKey] || [];
 
-    // Check if today is assigned
-    if (!assignedDates.includes(today)) {
-        // Find first available assigned date (today or future)
-        const futureDates = assignedDates.filter(d => d >= today).sort();
-        if (futureDates.length > 0) {
-            state.date = futureDates[0];
-        } else if (assignedDates.length > 0) {
-            // No future dates, use last assigned date
-            state.date = assignedDates.sort().pop();
-        } else {
-            // No dates at all this month, check next month
-            const nextMonth = new Date(today);
-            nextMonth.setMonth(nextMonth.getMonth() + 1);
-            nextMonth.setDate(1);
-            const nextMonthKey = formatLocalDate(nextMonth).substring(0, 7);
-            await fetchAssignedDates(nextMonthKey);
-            const nextMonthDates = assignedDatesCache[nextMonthKey] || [];
-            if (nextMonthDates.length > 0) {
-                state.date = nextMonthDates.sort()[0];
-            }
-            // If still no dates, we'll show an empty state (handled later)
-        }
+    const allAssignedDates = await getAllAssignedDates();
+    const futureAssignedDates = allAssignedDates.filter(date => date >= today);
+    if (futureAssignedDates.length > 0 && !futureAssignedDates.includes(today)) {
+        state.date = futureAssignedDates[0];
+        await fetchAssignedDates(state.date.substring(0, 7));
     }
 
     initEditableFields();
@@ -195,8 +177,7 @@ async function onLoginSuccess() {
     });
 
     setupEventListeners();
-    renderSchedule();
-    loadScheduleFromFirebase();
+    await loadScheduleFromFirebase();
 
     // Update pharmacy name from session if logged in as pharmacy
     // Update pharmacy name from session if logged in as pharmacy
@@ -204,6 +185,29 @@ async function onLoginSuccess() {
     if (session && !session.isAdmin && elements.pharmacyName) {
         elements.pharmacyName.textContent = session.name;
     }
+}
+
+function isCurrentDateAccessible() {
+    return state.ui.dateAccess?.allowed !== false;
+}
+
+async function refreshDateAccess(dateStr = state.date) {
+    if (isAdmin()) {
+        state.ui.dateAccess = { allowed: true };
+        return state.ui.dateAccess;
+    }
+
+    const access = await checkDateAssignment(dateStr);
+    state.ui.dateAccess = access;
+    return access;
+}
+
+function updateDateControls() {
+    if (!elements.addTechBreakBtn) return;
+
+    const locked = !isCurrentDateAccessible();
+    elements.addTechBreakBtn.disabled = locked;
+    elements.addTechBreakBtn.title = locked ? t('dateNotAssigned') : '';
 }
 
 function cacheElements() {
@@ -312,6 +316,15 @@ async function loadScheduleFromFirebase() {
         if (unsubscribeSnapshot) {
             unsubscribeSnapshot();
             unsubscribeSnapshot = null;
+        }
+
+        const access = await refreshDateAccess(state.date);
+        if (!access.allowed) {
+            const freshState = createInitialState();
+            state.schedule = freshState.schedule;
+            closeDrawer();
+            renderSchedule();
+            return;
         }
 
         const freshState = createInitialState();
@@ -721,6 +734,8 @@ async function fetchAssignedDates(monthKey) {
 // ==========================================
 
 function renderSchedule() {
+    updateDateControls();
+
     const { scheduleItems, slots, appointments, needsReschedule } = reflow(state.schedule);
 
     // Store computed values (don't overwrite schedule.appointments)
@@ -769,6 +784,8 @@ function createScheduleRow(item, appointments) {
         contentCol.innerHTML = createLunchBlock(item.id);
     } else if (item.type === 'techBreak') {
         contentCol.innerHTML = createTechBreakBlock(item.id);
+    } else if (!isCurrentDateAccessible()) {
+        contentCol.innerHTML = createUnavailableSlot(item.start);
     } else if (item.type === 'bookedAppointment' && item.data) {
         // Booked appointment (time-based block)
         // Ensure ID is passed!
@@ -812,6 +829,17 @@ function createAvailableSlot(startTime, blockId) {
       <span class="slot--available__text">
         <span class="material-symbols-outlined">add_circle</span>
         ${t('available')}
+      </span>
+    </div>
+  `;
+}
+
+function createUnavailableSlot(startTime) {
+    return `
+    <div class="slot--unavailable" data-slot-start="${startTime}">
+      <span class="slot--unavailable__text">
+        <span class="material-symbols-outlined">block</span>
+        ${t('unavailable')}
       </span>
     </div>
   `;
@@ -902,6 +930,8 @@ function attachDragHandlers() {
 }
 
 function handleDragEnd(dragResult) {
+    if (!isCurrentDateAccessible()) return;
+
     let scheduleChanged = false;
 
     // dragResult now contains: type, blockId, fromIndex, toIndex (position-based)
@@ -934,6 +964,8 @@ function handleDragUpdate(dragData) {
 // ==========================================
 
 function openDrawer(blockId, startTime) {
+    if (!isCurrentDateAccessible()) return;
+
     state.ui.selectedSlotId = blockId; // Block ID for new or existing
     state.ui.selectedTime = startTime;
     state.ui.drawerOpen = true;
@@ -962,6 +994,8 @@ function closeDrawer() {
 }
 
 function saveSlot() {
+    if (!isCurrentDateAccessible()) return;
+
     const startTime = state.ui.selectedTime;
     const blockId = state.ui.selectedSlotId;
     if (!startTime || !blockId) return;
@@ -986,6 +1020,8 @@ function saveSlot() {
 }
 
 function clearSlot() {
+    if (!isCurrentDateAccessible()) return;
+
     const appointmentId = state.ui.selectedSlotId;
     if (appointmentId) {
         state.schedule = clearAppointment(state.schedule, appointmentId);
@@ -1000,6 +1036,8 @@ function clearSlot() {
 // ==========================================
 
 function handleAddTechBreak() {
+    if (!isCurrentDateAccessible()) return;
+
     // With the new ordered block model, insert a tech break at position 1
     // (after the first slot, effectively at the beginning of the day)
     state.schedule = addTechBreak(state.schedule, 1);
@@ -1008,12 +1046,16 @@ function handleAddTechBreak() {
 }
 
 function handleDeleteTechBreak(breakId) {
+    if (!isCurrentDateAccessible()) return;
+
     state.schedule = removeTechBreak(state.schedule, breakId);
     renderSchedule();
     saveScheduleToFirebase();
 }
 
 async function handleClearAppointment(appointmentId) {
+    if (!isCurrentDateAccessible()) return;
+
     state.schedule = clearAppointment(state.schedule, appointmentId);
     renderSchedule();
 

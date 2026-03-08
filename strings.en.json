@@ -12,6 +12,7 @@
     "time": "Time",
     "details": "Details",
     "available": "Available",
+    "unavailable": "Unavailable",
     "lunch": "LUNCH",
     "lunchDuration": "60 Minutes",
     "techBreak": "Technical Break",

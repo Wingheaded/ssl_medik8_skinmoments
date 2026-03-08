@@ -224,6 +224,7 @@ let pharmacies = [];
 let admins = [];
 let pharmaciesById = {};
 let dateAssignments = {};
+let dateAssignmentsLoaded = false;
 let reservations = [];
 let selectedDates = [];
 let lockedDates = new Set();
@@ -375,8 +376,7 @@ async function loadPharmacies() {
             pin: secretsMap[doc.id] || '' // Merge secure PIN
         }));
 
-        pharmaciesById = buildPharmacyMap(pharmacies);
-
+        applyPharmacyAvailabilityState();
         filterAndRenderPharmacies();
         populatePharmacyDropdowns();
     } catch (error) {
@@ -503,8 +503,8 @@ function renderPharmaciesTable(listToRender = pharmacies, searchQuery = '') {
                 <td>${pharmacy.contact || '-'}</td>
                 <td><code>${pharmacy.pin}</code></td>
                 <td>
-                    <span class="admin-badge ${pharmacy.active ? 'admin-badge--success' : 'admin-badge--muted'}">
-                        ${pharmacy.active ? 'Ativa' : 'Inativa'}
+                    <span class="admin-badge ${pharmacy.effectiveActive ? 'admin-badge--success' : 'admin-badge--muted'}">
+                        ${pharmacy.effectiveActive ? 'Ativa' : 'Inativa'}
                     </span>
                 </td>
                 <td>
@@ -544,19 +544,20 @@ function filterAndRenderPharmacies() {
 }
 
 function populatePharmacyDropdowns() {
-    const activePharmacies = pharmacies.filter(p => p.active);
+    const assignablePharmacies = pharmacies.filter(p => p.active);
+    const filterablePharmacies = pharmacies;
 
     const assignSelect = document.getElementById('assignPharmacySelect');
     const filterSelect = document.getElementById('filterPharmacy');
 
     if (assignSelect) {
         assignSelect.innerHTML = '<option value="" disabled selected>Escolha uma farmácia...</option>' +
-            activePharmacies.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            assignablePharmacies.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     }
 
     if (filterSelect) {
         filterSelect.innerHTML = '<option value="">Todas as Farmácias</option>' +
-            activePharmacies.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            filterablePharmacies.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     }
 }
 
@@ -565,6 +566,32 @@ function buildPharmacyMap(list) {
         acc[pharmacy.id] = pharmacy;
         return acc;
     }, {});
+}
+
+function applyPharmacyAvailabilityState() {
+    const today = formatLocalDate(new Date());
+    const futureAssignedPharmacyIds = new Set();
+
+    if (dateAssignmentsLoaded) {
+        Object.values(dateAssignments).forEach(assignment => {
+            if (assignment?.pharmacyId && assignment.date >= today) {
+                futureAssignedPharmacyIds.add(assignment.pharmacyId);
+            }
+        });
+    }
+
+    pharmacies = pharmacies.map(pharmacy => {
+        const hasFutureAssignments = futureAssignedPharmacyIds.has(pharmacy.id);
+        return {
+            ...pharmacy,
+            hasFutureAssignments,
+            effectiveActive: dateAssignmentsLoaded
+                ? Boolean(pharmacy.active) && hasFutureAssignments
+                : Boolean(pharmacy.active)
+        };
+    });
+
+    pharmaciesById = buildPharmacyMap(pharmacies);
 }
 
 // ==========================================
@@ -943,8 +970,12 @@ async function loadDateAssignments() {
         snapshot.docs.forEach(doc => {
             dateAssignments[doc.id] = doc.data();
         });
+        dateAssignmentsLoaded = true;
 
         await reconcileAssignmentNames();
+        applyPharmacyAvailabilityState();
+        filterAndRenderPharmacies();
+        populatePharmacyDropdowns();
         renderAssignedDatesGrid();
         dateAssignmentCalendar?.redraw();
         filterSelectedDatesForPharmacy();

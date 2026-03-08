@@ -12,6 +12,7 @@
     "time": "Hora",
     "details": "Detalhes",
     "available": "Disponível",
+    "unavailable": "Indisponível",
     "lunch": "ALMOÇO",
     "lunchDuration": "60 Minutos",
     "techBreak": "Pausa Técnica",

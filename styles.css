@@ -535,6 +535,12 @@ select {
   background-color: var(--color-primary-dark);
 }
 
+.header__add-break-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--color-primary);
+}
+
 .header__add-break-btn span:last-child {
   display: none;
   /* Hide text by default */
@@ -848,6 +854,32 @@ select {
 
 .slot--available:hover .slot--available__text {
   color: var(--color-primary);
+}
+
+.slot--unavailable {
+  height: 100%;
+  width: 100%;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: not-allowed;
+  border: 1px solid var(--color-border);
+  background: linear-gradient(135deg,
+      rgba(0, 0, 0, 0.015) 0%,
+      rgba(0, 0, 0, 0.045) 100%);
+  opacity: 0.8;
+}
+
+.slot--unavailable__text {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
 /* Booked Slot */

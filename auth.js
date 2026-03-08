@@ -294,6 +294,31 @@ export async function getAssignedDates(monthKey) {
     }
 }
 
+export async function getAllAssignedDates() {
+    try {
+        const session = getSession();
+        if (!session) return [];
+
+        const assignmentsRef = collection(db, 'dateAssignments');
+        let q;
+
+        if (session.isAdmin) {
+            q = query(assignmentsRef);
+        } else {
+            q = query(assignmentsRef, where('pharmacyId', '==', session.pharmacyId));
+        }
+
+        const snapshot = await getDocs(q);
+        return snapshot.docs
+            .map(doc => doc.data().date)
+            .filter(Boolean)
+            .sort();
+    } catch (error) {
+        console.error('Error fetching all assigned dates:', error);
+        return [];
+    }
+}
+
 export async function checkDateAssignment(dateStr) {
     try {
         const session = getSession();
